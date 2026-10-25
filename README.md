@@ -11,7 +11,7 @@ Skill pour **Claude Code** et **Codex** · mémoire partagée avec Cursor, Gemin
 ![Dépendances](https://img.shields.io/badge/d%C3%A9pendances-aucune-brightgreen)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-d97757)
 ![Codex](https://img.shields.io/badge/Codex-skill-10a37f)
-![npx](https://img.shields.io/badge/install-npx-cb3837)
+[![npm](https://img.shields.io/npm/v/design-to-dev?color=cb3837)](https://www.npmjs.com/package/design-to-dev)
 
 </div>
 
@@ -71,13 +71,13 @@ Choisis ta méthode. Chacune te laisse choisir l'agent : **Claude Code**, **Code
 ### Avec npm / npx (recommandé)
 
 ```bash
-npx github:duckysface/design-to-dev
+npx design-to-dev
 ```
 
-Un menu demande où installer. Sans question :
+Un menu demande où installer. Installation globale possible : `npm i -g design-to-dev` puis `design-to-dev`. Sans question :
 
 ```bash
-npx github:duckysface/design-to-dev install --claude -y
+npx design-to-dev install --claude -y
 ```
 
 | Option | Installe dans |
@@ -116,9 +116,9 @@ Seul prérequis à l'usage : Python 3.9+ (`python` sur Windows, `python3` ailleu
 
 | Action | Commande |
 |---|---|
-| Vérifier Python et les installations | `npx github:duckysface/design-to-dev doctor` |
+| Vérifier Python et les installations | `npx design-to-dev doctor` |
 | Mettre à jour | relancer l'installation |
-| Désinstaller | `npx github:duckysface/design-to-dev uninstall --all` |
+| Désinstaller | `npx design-to-dev uninstall --all` |
 
 ## ▶️ Utilisation
 
@@ -136,9 +136,9 @@ La skill te pose d'abord **une seule question groupée** (cible, stack visée, m
 Pas besoin de passer par le nettoyage :
 
 ```bash
-npx github:duckysface/design-to-dev init . --agents claude,codex,cursor
-npx github:duckysface/design-to-dev init . --check     # contrôle sans rien écrire
-npx github:duckysface/design-to-dev init . --update    # met à jour le hook
+npx design-to-dev init . --agents claude,codex,cursor
+npx design-to-dev init . --check     # contrôle sans rien écrire
+npx design-to-dev init . --update    # met à jour le hook
 ```
 
 ---
