@@ -112,36 +112,26 @@ flowchart TD
 Chaque spécialiste reçoit sa part de l'inventaire et renvoie, pour chaque fichier, une action, une destination, une raison et un niveau de confiance.
 
 ```mermaid
-flowchart LR
-    INV[("inventory.json")] --> CODE & ASSETS & DOCS & ARCH
-
-    CODE["🧩 <b>code</b><br/>composants, tokens,<br/>écrans, bundles"]
-    ASSETS["🖼️ <b>assets</b><br/>images, polices, SVG,<br/>captures uploads/"]
-    DOCS["📚 <b>docs-tooling</b><br/>markdown, specimens,<br/>configs d'outils"]
-    ARCH["🏛️ <b>architect</b><br/>stack, arborescence,<br/>ADR 0001"]
-
-    CODE & ASSETS & DOCS & ARCH --> PLAN[("plan.json")]
-    PLAN --> CHECK["plan-check"]
-    CHECK -- "désaccord, confiance faible,<br/>données personnelles" --> REVIEW["❓ te sont posés"]
+flowchart TB
+    INV[("📄 inventory.json")]
+    INV --> CODE["🧩 code<br/>composants, tokens, écrans"]
+    INV --> ASSETS["🖼️ assets<br/>images, polices, captures"]
+    INV --> DOCS["📚 docs-tooling<br/>markdown, specimens, configs"]
+    INV --> ARCH["🏛️ architect<br/>stack, arborescence, ADR"]
+    CODE & ASSETS & DOCS & ARCH --> PLAN[("📋 plan.json")]
+    PLAN --> REVIEW["❓ cas douteux : te sont posés"]
 ```
 
 ### 🛡️ Ce que `plan-check` refuse
 
-```mermaid
-flowchart TD
-    P["Plan proposé"] --> Q1{"Chaque fichier a<br/>exactement une action ?"}
-    Q1 -- non --> X["❌ refusé"]
-    Q1 -- oui --> Q2{"Un fichier supprimé est<br/>encore utilisé (src, href,<br/>import…) ?"}
-    Q2 -- "oui, sans remplaçant" --> X
-    Q2 -- non --> Q3{"Deux fichiers vers<br/>la même destination ?"}
-    Q3 -- oui --> X
-    Q3 -- non --> Q4{"Destination hors<br/>de la cible ?"}
-    Q4 -- oui --> X
-    Q4 -- non --> V["✅ plan valide"]
+Avant toute copie, le plan est vérifié automatiquement. Il est **refusé** si :
 
-    style X fill:#fde2e2,stroke:#e57373,color:#000
-    style V fill:#d9f7e3,stroke:#34a853,color:#000
-```
+| ❌ | Cas refusé |
+|---|---|
+| 1 | un fichier n'a pas d'action, ou en a plusieurs |
+| 2 | un fichier supprimé est encore utilisé (`src`, `href`, `import`…) sans remplaçant |
+| 3 | deux fichiers arrivent au même endroit, ou un chemin serait à la fois fichier et dossier |
+| 4 | une destination sort de la cible |
 
 ---
 
@@ -150,12 +140,11 @@ flowchart TD
 ```
 mon-projet/
 ├── .claude/
-│   ├── memory/            🧠 MEMORY.md, etat.md, journal.md, changements.md,
-│   │                         decisions.md, problemes.md, PROTOCOLE.md, GRAPHE.md
+│   ├── memory/            état, journal, décisions, problèmes, protocole
 │   ├── hooks/graph_hook.py
-│   ├── graph/graph.json   🕸️ graphe des fichiers et de leurs dépendances
-│   ├── skills/<ds>/       🎨 skill de marque de l'export, si présente
-│   └── settings.json      ⚙️ hooks du graphe
+│   ├── graph/graph.json   graphe des fichiers et de leurs dépendances
+│   ├── skills/<ds>/       skill de marque de l'export, si présente
+│   └── settings.json      hooks du graphe
 ├── src/
 │   ├── styles/            index.css, tokens, components.css
 │   ├── components/<catégorie>/<Composant>/
@@ -164,7 +153,7 @@ mon-projet/
 ├── docs/
 │   ├── design-system/     README, specimens, références visuelles
 │   ├── adr/0001-structure-du-projet.md
-│   └── cleanup/           📋 report.md, file-map.json (avant → après)
+│   └── cleanup/           report.md, file-map.json (avant → après)
 ├── vendor/                bundles générés encore utilisés
 ├── CLAUDE.md
 ├── README.md
@@ -178,23 +167,14 @@ mon-projet/
 Le projet sort avec une **mémoire** qui survit d'une session à l'autre et un **graphe** de dépendances mis à jour automatiquement.
 
 ```mermaid
-flowchart LR
-    subgraph SESSION["Session Claude Code"]
-        direction TB
-        START(["Démarrage"]) --> WORK["Write / Edit / Bash<br/>Agent / Skill"] --> FIN(["Fin / compaction"])
-    end
-
-    HOOK["⚙️ graph_hook.py"]
-    GRAPH[("🕸️ graph.json")]
-    MEM[("🧠 .claude/memory/")]
-
-    START -- "SessionStart" --> HOOK
-    WORK -- "PostToolUse" --> HOOK
-    FIN -- "Stop · PreCompact<br/>SessionEnd" --> HOOK
-    HOOK --> GRAPH
-    HOOK -- "résumé injecté<br/>au démarrage" --> START
-    WORK -- "Claude met à jour<br/>état, journal, décisions" --> MEM
-    MEM -. "lu au démarrage" .-> START
+flowchart TB
+    S1(["▶️ Début de session"]) -- "SessionStart" --> HOOK["⚙️ graph_hook.py"]
+    S2["✏️ Claude modifie des fichiers"] -- "PostToolUse" --> HOOK
+    S3(["⏹️ Fin de session"]) -- "Stop / SessionEnd" --> HOOK
+    HOOK --> GRAPH[("🕸️ graph.json<br/>qui importe qui")]
+    S2 --> MEM[("🧠 .claude/memory/<br/>état, journal, décisions")]
+    GRAPH -. "résumé au démarrage" .-> S1
+    MEM -. "relu au démarrage" .-> S1
 ```
 
 | Fichier | Rôle |
