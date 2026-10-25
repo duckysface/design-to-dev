@@ -250,6 +250,8 @@ La sécurité passe **avant** le plan : un plan bâti sur une base douteuse hér
 ```bash
 npx design-to-dev foundations ./mon-projet --strict
 npx design-to-dev deps ./mon-projet --online     # failles connues, versions stables, fin de support
+npx design-to-dev security-kit install ./mon-projet   # skills de sécurité épinglées dans .claude/skills (accord requis)
+npx design-to-dev security-kit verify ./mon-projet    # avant chaque commit
 ```
 
 | Contrôle | Exemples |
@@ -263,6 +265,21 @@ npx design-to-dev deps ./mon-projet --online     # failles connues, versions sta
 | Secrets | clés en dur, vrai `.env` |
 | Dépendances (`--online`) | failles connues et ce qu'elles touchent, version corrigée, dernière version stable, historique, paquets abandonnés ou malveillants |
 | Runtimes et frameworks | PHP, Node, Python, Laravel… en fin de support, version maintenue conseillée |
+
+### Kit de sécurité du projet
+
+`security-kit` copie dans `.claude/skills/` des skills de sécurité choisies, **à une version épinglée** (commit + empreinte SHA-256 de chaque fichier) et **scannées avant l'installation**. La sélection dépend du projet :
+
+| Quand | Skills | Source |
+|---|---|---|
+| Toujours | threat-modeling, dependency-scanning, secrets-management, owasp-top-10-web, api-security, secure-code-review | [UnitOneAI/SecuritySkills](https://github.com/UnitOneAI/SecuritySkills) (MIT) |
+| Toujours | security-audit | [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT) |
+| Toujours | sharp-edges, differential-review | [trailofbits/skills](https://github.com/trailofbits/skills) (CC BY-SA 4.0) |
+| Workflows GitHub Actions | agentic-actions-auditor | trailofbits/skills |
+| Projet qui utilise un LLM | llm-top-10, prompt-injection | UnitOneAI/SecuritySkills |
+| Sur demande (`--optional`) | supply-chain-risk-auditor | trailofbits/skills |
+
+Rien n'est installé sans ton accord. L'outil écrit aussi la section « Kit de sécurité » d'`AGENTS.md` : les agents appliquent ces skills à chaque modification de code et lancent `verify` avant chaque commit.
 
 Chaque point est classé ✅ / ⚠️ / ❌ dans `docs/security/fondations.md`. Aucune tâche backend ne commence tant qu'un ❌ reste ouvert. Ensuite, `security` repère les motifs à risque (XSS, SQL concaténé, jetons dans `localStorage`…) et `requirements` écrit la checklist de ta stack.
 
@@ -305,6 +322,7 @@ Méthode inspirée de [cloudflare/security-audit-skill](https://github.com/cloud
 | `scan <dossier>` | Intention, écrans, contrat backend, stack conseillée |
 | `foundations <dossier>` | Vérifie la base ✅ / ⚠️ / ❌ (`--strict` pour la CI) |
 | `security <dossier>` | Motifs à risque (CWE + ASVS + correctif) |
+| `security-kit list\|install\|verify <dossier>` | Kit de skills de sécurité épinglées dans `.claude/skills` |
 | `requirements --intent dashboard` | Checklist de sécurité pour la stack |
 | `skills` | superpowers et security-audit sont-elles installées ? |
 | `inventory <dossier>` | Inventaire brut des fichiers |

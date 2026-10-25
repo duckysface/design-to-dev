@@ -585,7 +585,8 @@ COMPANIONS = {
     },
     "security-audit": {
         "skills": ["security-audit"],
-        "install": {"all": "npx skills add https://github.com/cloudflare/security-audit-skill --skill security-audit --global"},
+        "install": {"all": "npx skills add https://github.com/cloudflare/security-audit-skill --skill security-audit --global",
+                    "projet": "npx design-to-dev security-kit install . (copie épinglée et scannée dans .claude/skills)"},
         "repo": "https://github.com/cloudflare/security-audit-skill",
     },
 }

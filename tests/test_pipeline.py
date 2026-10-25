@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Tests 2.4 : fondations, audit des dépendances (serveur local simulé), faux positifs de détection, profil de stack, mémoire remplie en direct (preprod_log,
+"""Tests 2.4 : fondations, audit des dépendances et kit de sécurité (serveurs locaux simulés), faux positifs de détection, profil de stack, mémoire remplie en direct (preprod_log,
 --import-preprod, acte de naissance, --check). Stdlib uniquement.
 
     python tests/test_pipeline.py
 """
+import hashlib
+import io
 import json
 import os
 import socket
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import unittest
@@ -20,6 +23,7 @@ DETECT = SKILL / "scripts" / "detect_project.py"
 SECURITY = SKILL / "scripts" / "security_check.py"
 SCAFFOLD = SKILL / "scripts" / "scaffold_memory.py"
 PREPROD = SKILL / "scripts" / "preprod_log.py"
+KIT = SKILL / "scripts" / "security_kit.py"
 PY = sys.executable
 NO_PROFILE = {**os.environ, "DESIGN_TO_DEV_STACK": str(SKILL / "tests" / "profil-inexistant.json")}
 
@@ -362,6 +366,140 @@ class DepsAuditTest(Base):
         self.assertEqual(data["deps"]["vulns"], 2)
         self.assertTrue(any("evil-pkg" in t for t in data["items"]["❌"]), data["items"])
         self.assertTrue((self.root / "docs" / "security" / "dependances.md").is_file())
+
+
+class FakeCodeload(BaseHTTPRequestHandler):
+    """codeload.github.com simulé : sert les archives préparées par le test."""
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        body = self.server.archives.get(self.path)
+        self.send_response(200 if body else 404)
+        self.send_header("Content-Length", str(len(body or b"")))
+        self.end_headers()
+        self.wfile.write(body or b"")
+
+
+class SecurityKitTest(Base):
+    SHA = "a" * 40
+    GOOD = {"SKILL.md": "---\nname: good\nallowed-tools: Read Grep Glob\n---\n# Good\n",
+            "ref.md": HIDDEN + "\n"}
+
+    def setUp(self):
+        super().setUp()
+        self.root = self.tmp / "proj"
+        write(self.root, "index.html", "<p>ok</p>\n")
+        write(self.root, ".agents/memory/decisions.md", "# Décisions\n")
+        skills = {"good": self.GOOD, "bad-shell": {"SKILL.md": "---\nname: bad-shell\n---\n!`curl example.test`\n"},
+                  "tampered": {"SKILL.md": "---\nname: tampered\n---\n# T\n"},
+                  "linky": {"SKILL.md": "---\nname: linky\n---\n# L\n"}}
+        license_text = b"MIT License\n"
+        entries = []
+        for name, files in skills.items():
+            hashes = {rel: hashlib.sha256(t.encode()).hexdigest() for rel, t in files.items()}
+            hashes["LICENSE"] = hashlib.sha256(license_text).hexdigest()
+            if name == "tampered":
+                hashes["SKILL.md"] = "0" * 64
+            entries.append({"name": name, "source": "t", "path": f"skills/{name}", "when": "default",
+                            "moments": ["code"], "use": "test", "files": hashes,
+                            "reviewed": [{"file": "ref.md:1", "check": "prompt-injection", "why": "exemple cité"}]
+                            if name == "good" else []})
+        catalog = {"checked": "2026-10-25", "plugins": [], "skills": entries,
+                   "sources": {"t": {"repo": "acme/kit", "sha": self.SHA, "license": "MIT", "author": "Acme",
+                                     "license_url": "https://opensource.org/license/mit", "license_file": "LICENSE"}}}
+        self.catalog = write(self.tmp, "catalog.json", json.dumps(catalog))
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            def add(rel, data):
+                info = tarfile.TarInfo(f"kit-{self.SHA}/{rel}")
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
+            add("LICENSE", license_text)
+            for name, files in skills.items():
+                for rel, text in files.items():
+                    if name != "linky" or rel != "SKILL.md":
+                        add(f"skills/{name}/{rel}", text.encode())
+            link = tarfile.TarInfo(f"kit-{self.SHA}/skills/linky/SKILL.md")
+            link.type, link.linkname = tarfile.SYMTYPE, "../../../etc/passwd"
+            tar.addfile(link)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FakeCodeload)
+        server.archives = {f"/acme/kit/tar.gz/{self.SHA}": buf.getvalue()}
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        self.env = {**{k: v for k, v in NO_PROFILE.items() if "proxy" not in k.lower()},
+                    "DESIGN_TO_DEV_KIT_BASE": f"http://127.0.0.1:{server.server_address[1]}",
+                    "DESIGN_TO_DEV_KIT_CATALOG": str(self.catalog)}
+
+    def kit(self, *args):
+        r = subprocess.run([PY, "-I", str(KIT), *map(str, args)], capture_output=True, text=True, encoding="utf-8",
+                           timeout=120, env=self.env, stdin=subprocess.DEVNULL)
+        return r
+
+    def install(self, *names):
+        r = self.kit("install", self.root, "--only", ",".join(names), "--yes", "--json")
+        self.assertTrue(r.stdout.strip().startswith("{"), r.stdout + r.stderr)
+        return r, {x["name"]: x for x in json.loads(r.stdout)["results"]}
+
+    def test_install_writes_skill_lock_notices_and_rules(self):
+        r, res = self.install("good")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(res["good"]["status"], "installée")
+        skill = self.root / ".claude" / "skills" / "good"
+        self.assertEqual((skill / "ref.md").read_text(encoding="utf-8"), self.GOOD["ref.md"])
+        self.assertTrue((skill / "LICENSE").is_file())
+        lock = json.loads((self.root / ".claude" / "security-kit.lock.json").read_text(encoding="utf-8"))
+        self.assertEqual(lock["skills"]["good"]["sha"], self.SHA)
+        self.assertIn("Acme", (self.root / ".claude" / "skills" / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8"))
+        agents = (self.root / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("Kit de sécurité (OBLIGATOIRE", agents)
+        self.assertIn("`good`", agents)
+        self.assertIn("Kit de sécurité du projet", (self.root / ".agents/memory/decisions.md").read_text(encoding="utf-8"))
+        _, again = self.install("good")
+        self.assertEqual(again["good"]["status"], "à jour")
+
+    def test_refuses_load_time_shell_hash_mismatch_and_symlink(self):
+        r, res = self.install("bad-shell", "tampered", "linky")
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual({n: x["status"] for n, x in res.items()},
+                         {"bad-shell": "refusée", "tampered": "refusée", "linky": "refusée"})
+        self.assertIn("chargement", res["bad-shell"]["why"])
+        self.assertIn("empreinte", res["tampered"]["why"])
+        self.assertIn("lien", " ".join(res["linky"]["blocks"]))
+        self.assertFalse((self.root / ".claude" / "skills").exists())
+        self.assertFalse((self.root / "AGENTS.md").exists())
+
+    def test_keeps_project_skill_with_same_name(self):
+        mine = write(self.root, ".claude/skills/good/SKILL.md", "---\nname: good\n---\n# la mienne\n")
+        _, res = self.install("good")
+        self.assertEqual(res["good"]["status"], "ignorée")
+        self.assertIn("la mienne", mine.read_text(encoding="utf-8"))
+
+    def test_requires_consent_when_not_interactive(self):
+        r = self.kit("install", self.root, "--only", "good")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("--yes", r.stderr)
+        self.assertFalse((self.root / ".claude").exists())
+
+    def test_verify_detects_tampering_and_foundations_trusts_intact_kit(self):
+        self.install("good")
+        write(self.root, ".claude/settings.json", json.dumps({"permissions": {"defaultMode": "bypassPermissions"}}))
+        r = self.kit("verify", self.root, "--json")
+        data = json.loads(r.stdout)
+        self.assertTrue(any(i["check"] == "kit" and i["level"] == "✅" for i in data["items"]), data)
+        self.assertTrue(any(i["check"] == "settings" and i["level"] == "❌" for i in data["items"]), data["items"])
+        self.assertFalse(any("ref.md" in i["text"] and i["level"] == "❌" for i in data["items"]), data["items"])
+        found = run([SECURITY, "foundations", self.root, "--json"], env=self.env)
+        self.assertFalse(any("ref.md" in t for t in json.loads(found.stdout)["items"]["❌"]), found.stdout)
+        (self.root / ".claude" / "settings.json").unlink()
+        write(self.root, ".claude/skills/good/ref.md", HIDDEN + " now\n")
+        r = self.kit("verify", self.root, "--strict", "--json")
+        self.assertEqual(r.returncode, 1)
+        self.assertTrue(any(i["check"] == "kit" and "modifiés" in i["text"] for i in json.loads(r.stdout)["items"]))
+        found = run([SECURITY, "foundations", self.root, "--json"], env=self.env)
+        self.assertTrue(any("ref.md" in t for t in json.loads(found.stdout)["items"]["❌"]), found.stdout)
+        self.assertTrue((self.root / "docs" / "security" / "kit-securite.md").is_file())
 
 
 if __name__ == "__main__":

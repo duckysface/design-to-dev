@@ -19,12 +19,13 @@ Les modèles copiés dans ton projet (`AGENTS.md`, `PROTOCOLE.md`, `GRAPHE.md`, 
 
 ## Travaux de tiers
 
-design-to-dev **n'inclut aucun code de tiers**. Les projets ci-dessous sont cités ou s'installent séparément, avec ton accord, sous leur propre licence :
+design-to-dev **n'inclut aucun code de tiers**. Les projets ci-dessous sont cités ou s'installent séparément, avec ton accord, sous leur propre licence. [`references/security-kit.json`](references/security-kit.json) ne contient que des chemins, des commits et des empreintes ; `security-kit install` télécharge les fichiers depuis GitHub et les copie dans **ton** projet avec leur licence (`LICENSE` dans chaque dossier, `THIRD_PARTY_NOTICES.md`) :
 
 | Projet | Lien avec design-to-dev |
 |---|---|
-| [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) | Méthode d'audit résumée dans [`references/security.md`](references/security.md) ; installable en option |
-| [UnitOneAI/SecuritySkills](https://github.com/UnitOneAI/SecuritySkills) | Inspiration des checklists de sécurité |
+| [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) | Méthode d'audit résumée dans [`references/security.md`](references/security.md) ; installable en option et dans le kit de sécurité (MIT, © Cloudflare, Inc.) |
+| [UnitOneAI/SecuritySkills](https://github.com/UnitOneAI/SecuritySkills) | Inspiration des checklists de sécurité ; skills du kit de sécurité (MIT, © UnitOne.ai) |
+| [trailofbits/skills](https://github.com/trailofbits/skills) | Skills du kit de sécurité (CC BY-SA 4.0, © Trail of Bits) : copiées sans modification ; toute adaptation doit rester sous CC BY-SA 4.0 avec attribution |
 | [obra/superpowers](https://github.com/obra/superpowers) | Skill de planification, installable en option |
 
 ## Référentiels

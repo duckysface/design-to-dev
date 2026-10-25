@@ -163,6 +163,21 @@ python "$SKILL/scripts/security_check.py" requirements --intent <intention[,back
 - `scan` : candidats seulement (`candidate` / `needs_validation`, CWE + ASVS + correctif minimal), jamais de sévérité. Trier chaque entrée (faux positif / à corriger / maquette seulement) dans `docs/security/baseline.md`. Secrets toujours masqués.
 - `requirements` : checklist par stack + exigences déduites des écrans + endpoints à protéger, à intégrer au plan.
 
+### 6b — Kit de sécurité du projet (avec accord)
+
+```bash
+python "$SKILL/scripts/security_kit.py" list "<cible>"                 # skills proposées selon le projet (versions épinglées)
+python "$SKILL/scripts/security_kit.py" install "<cible>" --dry-run    # téléchargement + scan, rien d'écrit
+python "$SKILL/scripts/security_kit.py" install "<cible>" --yes        # seulement après l'accord explicite de l'utilisateur
+python "$SKILL/scripts/security_kit.py" verify "<cible>" --strict      # → docs/security/kit-securite.md
+```
+
+- Montrer la liste (`list`) à l'utilisateur : nom, dépôt, licence, à quoi sert chaque skill. **Demander son accord** avant `install` (accès à codeload.github.com, copie dans `.claude/skills/`). `--optional` ajoute les skills marquées « accord requis » (elles vont en ligne ou demandent d'autres outils).
+- `install` télécharge chaque source à son commit épinglé, vérifie l'empreinte SHA-256 de **chaque fichier**, puis le scanne (commandes exécutées au chargement, hooks, contournement des permissions, consignes cachées, Unicode invisible, binaires). Un seul ❌ → skill refusée, rien n'est écrit. Une skill du même nom déjà présente dans le projet n'est jamais écrasée.
+- Il écrit `.claude/security-kit.lock.json`, `.claude/skills/THIRD_PARTY_NOTICES.md` (licences, attribution) et la section « Kit de sécurité » de `AGENTS.md` : quelles skills appliquer aux fondations, à chaque modification de code et avant chaque commit. Ces règles s'imposent ensuite à tous les agents.
+- Ne jamais lancer les scripts fournis par ces skills sans l'accord de l'utilisateur ; ne jamais modifier leurs fichiers (sinon `verify` les marque ❌).
+- `verify` avant chaque commit : empreintes du kit, scan de `.claude/`, `.agents/skills`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, et réglages dangereux de `settings.json` (`bypassPermissions`, `Bash(*)`, hooks).
+
 ## Étape 7 — Plan du projet (superpowers) — mode complet
 
 Mode rapide : journal `--step 7 --title "(ignorée — mode rapide)"`, et `etat --next` = première tâche de `docs/design/screens.md` (ou le premier ❌ de `fondations.md`).

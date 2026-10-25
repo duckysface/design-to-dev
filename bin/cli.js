@@ -53,6 +53,9 @@ Outils (lecture seule, sans agent) :
   npx design-to-dev inventory <dossier> [--out f.json]  inventaire des fichiers (refs, doublons, signaux)
   npx design-to-dev foundations <dossier> [--strict] [--online]   fondations ✅/⚠️/❌ → docs/security/fondations.md
   npx design-to-dev deps <dossier> [--online]   failles connues, versions stables, fin de support → docs/security/dependances.md
+  npx design-to-dev security-kit list [<dossier>]        skills de sécurité proposées (versions épinglées)
+  npx design-to-dev security-kit install <dossier> [--yes]   copie dans .claude/skills après scan (accord requis)
+  npx design-to-dev security-kit verify <dossier> [--strict]  empreintes + scan de .claude/ → docs/security/kit-securite.md
   npx design-to-dev security <dossier> [--out f.json]   base de sécurité statique (candidats, CWE/ASVS)
   npx design-to-dev requirements --intent dashboard     exigences de sécurité par stack
   npx design-to-dev skills                              superpowers et security-audit installées ?
@@ -243,13 +246,15 @@ const PY_TOOLS = {
   deps: ["security_check.py", "deps"],
   security: ["security_check.py", "scan"],
   requirements: ["security_check.py", "requirements"],
+  "security-kit": ["security_kit.py", null],
 };
 
 function pyTool(cmd, rest) {
   const py = findPython();
   if (!py) fail("Python 3.9+ est nécessaire.");
   const [script, sub] = PY_TOOLS[cmd];
-  const r = spawnSync(py, [path.join(PKG_ROOT, "scripts", script), sub, ...rest], { stdio: "inherit" });
+  const args = sub ? [sub, ...rest] : rest;
+  const r = spawnSync(py, [path.join(PKG_ROOT, "scripts", script), ...args], { stdio: "inherit" });
   process.exit(r.status ?? 1);
 }
 

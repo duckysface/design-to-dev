@@ -6,8 +6,8 @@ Seule la dernière version publiée sur npm reçoit des correctifs de sécurité
 
 | Version | Suivie |
 |---|---|
-| 2.3.x | ✅ |
-| < 2.3 | ❌ (mets à jour : `npx design-to-dev install`) |
+| 2.4.x | ✅ |
+| < 2.4 | ❌ (mets à jour : `npx design-to-dev install`) |
 
 ## Signaler une faille
 

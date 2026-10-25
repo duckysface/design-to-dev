@@ -1,0 +1,410 @@
+{
+ "checked": "2026-10-25",
+ "sources": {
+  "trailofbits": {
+   "repo": "trailofbits/skills",
+   "license": "CC-BY-SA-4.0",
+   "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "author": "Trail of Bits",
+   "sha": "196a9073ab10d35bacf111f945e02c00b2c6883a",
+   "license_file": "LICENSE"
+  },
+  "unitone": {
+   "repo": "UnitOneAI/SecuritySkills",
+   "license": "MIT",
+   "license_url": "https://opensource.org/license/mit",
+   "author": "UnitOne.ai",
+   "sha": "70bc259bb01abb3015ad2ad859ad5253cbf0bcab",
+   "license_file": "LICENSE"
+  },
+  "cloudflare": {
+   "repo": "cloudflare/security-audit-skill",
+   "license": "MIT",
+   "license_url": "https://opensource.org/license/mit",
+   "author": "Cloudflare, Inc.",
+   "sha": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
+   "license_file": "LICENSE"
+  }
+ },
+ "skills": [
+  {
+   "name": "threat-modeling",
+   "source": "unitone",
+   "path": "skills/appsec/threat-modeling",
+   "when": "default",
+   "moments": [
+    "fondations"
+   ],
+   "use": "modèle de menaces STRIDE des briques du projet",
+   "excluded": [],
+   "files": {
+    "SKILL.md": "a7becb43d40804a9514ee784cb9382f8ecfe3cba9241bd499f77014290bd39d3",
+    "csharp-dotnet.md": "d0f55860997b233298b981330e8dcb9f1e96b01476bcff73c3ab9875582d79c4",
+    "threat-actor-profiles.md": "7794330c89cde0f62e4a16e4c8657a5ed16cec65d31af3b9a146a598576dd404",
+    "LICENSE": "66eb5ec637cc578833ddcbc870dbf46c6718fd83e985fad5f0f5cf30d60cf47d"
+   },
+   "reviewed": [
+    {
+     "file": "SKILL.md:486",
+     "check": "prompt-injection",
+     "why": "consigne de sécurité de la skill qui cite l'attaque pour dire de ne pas la suivre"
+    }
+   ]
+  },
+  {
+   "name": "security-audit",
+   "source": "cloudflare",
+   "path": "skills/security-audit",
+   "when": "default",
+   "moments": [
+    "fondations"
+   ],
+   "use": "audit guidé du dépôt (mode conseil ; jamais de sonde sur un site en ligne)",
+   "excluded": [
+    "validate-coverage-ledger.test.cjs",
+    "validate-findings.test.cjs"
+   ],
+   "files": {
+    "AI-AND-LLM.md": "7335a95c43554eadefcf03ece639291bb0e038c398a179299e3887ffe06bd2ef",
+    "ATTACK-CLASSES.md": "3ee4f00c6e8c9dcf6dd02dd5ac2a4ceb322e2085f3e9fbe79cf0c6330bc7ef83",
+    "CLIENT-SIDE.md": "613f6b98f86083e045525c5b60154ffdab122bac35f1e05eb17488e6e453370c",
+    "CLOUD-AND-DEPLOYMENT.md": "3c80f3088be22345e07b057c056d6ed99fe2b0304f794398964f7ccd5a496ca3",
+    "DATA-ISOLATION-AND-LIFECYCLE.md": "307dcb3e24d292715c4a041190e7bb135646a37eb6187619ae01d000a634a4ad",
+    "DESKTOP-MOBILE-AND-LOCAL-IPC.md": "58eae8ee0ca6a46611c501ec5a3ab47fdff88dd7db0d8d74789bbf8bb19d8cb2",
+    "HUNTING.md": "71c121decea1322c47c718f6e110f1a892980bb4266bd7ac55ef043a213ade09",
+    "MEMORY-SAFETY-AND-BINARY.md": "7c8b0dccfb35315cca2455509674d49632b2fe37e1f3aac16c1a496a7e9924a7",
+    "PROTOCOLS-RPC-AND-MESSAGING.md": "8b73816fa5b3697c9c40977f0c836b40f01d6e81929ff2720fe83ce089e9a619",
+    "RECONNAISSANCE.md": "02ca887aca84de8ae137f1891bd2f0a54f28d3fa6da92a27f54734382b3381a2",
+    "RESOURCE-EXHAUSTION-AND-AVAILABILITY.md": "4326fab5c92a0b4c420a70196254040105cd794026562130b59bf1a6db3e4baa",
+    "SKILL.md": "5e3e96a1e438d8f35fef0a1e38f02d4f00e2bdf910401b7dfe00e6779c6dac85",
+    "SUPPLY-CHAIN-AND-RELEASE.md": "f372e919940e335468ba1ae09f99026c3986a345f7fe26f8068f132e199f52a5",
+    "VALIDATION-AND-REPORTING.md": "b892470cb89bb31f33403e050d4bdfbe2cdaef940ade1496fa65e32b2e129449",
+    "WEB-PROTOCOL-AND-AUTH.md": "4f3066dffa23c5635859187be9b96c32f2aff29a688186b91ff0c63e47d62b5c",
+    "report-schema.json": "6575c9de4a62255699ea052ebf9a49ebfb373a32891bcd89af6f55cc84b35519",
+    "validate-coverage-ledger.cjs": "2eb280bd2e33c002916f86db9b29f9edfedb6454e5db973c766290465b868ac8",
+    "validate-findings.cjs": "e85f232e36bfac0f866f244da50376692d6b45c690beadcb00608b0e6c8b5283",
+    "LICENSE": "e598e694aa506650c7192d5ea3be0e50aca0d356ea00551c53429f0b01eb6391"
+   },
+   "reviewed": []
+  },
+  {
+   "name": "dependency-scanning",
+   "source": "unitone",
+   "path": "skills/appsec/dependency-scanning",
+   "when": "default",
+   "moments": [
+    "fondations"
+   ],
+   "use": "dépendances vulnérables ou abandonnées",
+   "excluded": [],
+   "files": {
+    "SKILL.md": "740c604e9ce303db6fac4198779867cd44894ab3e34edc1bba3fa455b4f0f4a5",
+    "csharp-dotnet.md": "84d28c527639f3947eec7b601d57b3c2436c99d5b8077dd0763df69bb33af092",
+    "LICENSE": "66eb5ec637cc578833ddcbc870dbf46c6718fd83e985fad5f0f5cf30d60cf47d"
+   },
+   "reviewed": [
+    {
+     "file": "SKILL.md:250",
+     "check": "prompt-injection",
+     "why": "consigne de sécurité de la skill qui cite l'attaque pour dire de ne pas la suivre"
+    }
+   ]
+  },
+  {
+   "name": "secrets-management",
+   "source": "unitone",
+   "path": "skills/devsecops/secrets-management",
+   "when": "default",
+   "moments": [
+    "fondations",
+    "commit"
+   ],
+   "use": "secrets, .env, rotation",
+   "excluded": [],
+   "files": {
+    "SKILL.md": "d95159aa2543f66b9fd2ca599777bc9b469319d8a237a9c81a13d124aed1124a",
+    "LICENSE": "66eb5ec637cc578833ddcbc870dbf46c6718fd83e985fad5f0f5cf30d60cf47d"
+   },
+   "reviewed": []
+  },
+  {
+   "name": "owasp-top-10-web",
+   "source": "unitone",
+   "path": "skills/appsec/owasp-top-10-web",
+   "when": "default",
+   "moments": [
+    "fondations",
+    "code"
+   ],
+   "use": "OWASP Top 10 web",
+   "excluded": [],
+   "files": {
+    "SKILL.md": "9ad620c93944c843b0e816157de1fb22ac4e467caf722ccc5f308c36d5b3b88b",
+    "csharp-dotnet.md": "8ae2481c853241e4fa3008cf52a4df3ebb13ec4970268e8dcd00517d43566461",
+    "LICENSE": "66eb5ec637cc578833ddcbc870dbf46c6718fd83e985fad5f0f5cf30d60cf47d"
+   },
+   "reviewed": []
+  },
+  {
+   "name": "api-security",
+   "source": "unitone",
+   "path": "skills/appsec/api-security",
+   "when": "default",
+   "moments": [
+    "fondations",
+    "code"
+   ],
+   "use": "OWASP API Top 10",
+   "excluded": [],
+   "files": {
+    "SKILL.md": "1cc3b44482a0f3060c0481a9c089a6254cb90d6264c6ca9ef02a38957a6c8029",
+    "api-top10-checklist.md": "6ff1230dce664f16f505c5b681748a5c41cddf6436f6363eb52ca66d93de2d73",
+    "csharp-dotnet.md": "714c8f5cc2cabd71869ca90ca119e92a889a786969b4dc1a90af33b973a74fe5",
+    "LICENSE": "66eb5ec637cc578833ddcbc870dbf46c6718fd83e985fad5f0f5cf30d60cf47d"
+   },
+   "reviewed": []
+  },
+  {
+   "name": "secure-code-review",
+   "source": "unitone",
+   "path": "skills/appsec/secure-code-review",
+   "when": "default",
+   "moments": [
+    "code"
+   ],
+   "use": "revue de sécurité du code modifié",
+   "excluded": [],
+   "files": {
+    "SKILL.md": "f18fb31b59ac983f0235301765eb5f45f4db14089353338e9a05e11f96f8e086",
+    "csharp-dotnet.md": "4cbc4574417bd024227827f5de60a1fba3930373c5a837ac880818cabd51513a",
+    "LICENSE": "66eb5ec637cc578833ddcbc870dbf46c6718fd83e985fad5f0f5cf30d60cf47d"
+   },
+   "reviewed": []
+  },
+  {
+   "name": "sharp-edges",
+   "source": "trailofbits",
+   "path": "plugins/sharp-edges/skills/sharp-edges",
+   "when": "default",
+   "moments": [
+    "code"
+   ],
+   "use": "API et réglages dangereux par défaut",
+   "excluded": [
+    "agents/openai.yaml"
+   ],
+   "files": {
+    "SKILL.md": "3b69a709c2f8f0cfcf57d40a3186e166f307865cc8ed924be4098e549a121e9c",
+    "assets/trail-of-bits-mark.svg": "4bf74c789b38dcf6ad762c136b6832363d27ae19fbaa9a18ec18d66ecce6ca05",
+    "references/auth-patterns.md": "1fbf526ca1db7204f9ebb1bf4eb3c48c544676623d23e5d28e01f6f63c355be2",
+    "references/case-studies.md": "2e81a320728b4597bf84c490176d5bf212f1e6ba6f87aafba61ad1734de35332",
+    "references/config-patterns.md": "1d99f2716f7bef18efe71015ce0c56e0f4961c042faa503d796d6d4d1626fdc6",
+    "references/crypto-apis.md": "8baddc83a1f964d6d8b15678d60a37c93029c18dc162bd7c00895e585ff1a825",
+    "references/lang-c.md": "d077d711c73749c924eae81c06018b14bbf1ec9b93d71723c472b43df5d7d5ae",
+    "references/lang-csharp.md": "8fa9e93d36c0e1397b7ca81307163370fc43cf700215b7c6d7aa1b09fdb91fb4",
+    "references/lang-go.md": "839c0e7b4e3fa2f3b37c651e926aa59d69d20bfef5e67f569eedacf11354844d",
+    "references/lang-java.md": "3b93b6049f7e0e356a1ffebc0b4642f3cef315d90be45b63e15c8c4814f9ebeb",
+    "references/lang-javascript.md": "cf72f55d31318666942a8d1d64340befc3c4e7223afc2ca196e6a776ffa4c895",
+    "references/lang-kotlin.md": "c891148c10a4941c3396416a10ac64512eb3a9e13ea5eeaec3902da4b51501dd",
+    "references/lang-php.md": "7960d9773874cf06c5b470a5ca3ab406d896e66b71e713d809bc1ecfcab63485",
+    "references/lang-python.md": "36543becc25b4e3f41eaedcab62e9b204657e6742b8ac95e405bcd040d33bf03",
+    "references/lang-ruby.md": "d9ba749caaccb8a3bb39e2199b2062c0957cf48739218ba8022d49be5cba2088",
+    "references/lang-rust.md": "3d14993ea70b2b2df3fc0f388cbd1631470895c27ccbd9d764296d1da8f5b6ee",
+    "references/lang-swift.md": "a64ab8692db0f3e43526088c63c7fdcb7354d1b24e6fe7ca759aea3260890e04",
+    "references/language-specific.md": "4522b4a37cfd7d3aa689209dfd4569f3b39074bd1f5987a36a6e819f501141b6",
+    "LICENSE": "7abe19ec9bb73b36141b999b861d24ad855e808bafe0f81e84cce28556f6c297"
+   },
+   "reviewed": []
+  },
+  {
+   "name": "differential-review",
+   "source": "trailofbits",
+   "path": "plugins/differential-review/skills/differential-review",
+   "when": "default",
+   "moments": [
+    "commit",
+    "code"
+   ],
+   "use": "revue du diff avant commit",
+   "excluded": [
+    "agents/openai.yaml"
+   ],
+   "files": {
+    "SKILL.md": "f9af6a8193fc1a9f8ca3c54bb8d19095a5f20c9472ca6d014488bbde50b67da0",
+    "adversarial.md": "3cb823f38c6e551cbcf5f72325d2bb219dacdad774072519c31d50d92db19800",
+    "assets/trail-of-bits-mark.svg": "4bf74c789b38dcf6ad762c136b6832363d27ae19fbaa9a18ec18d66ecce6ca05",
+    "methodology.md": "16b335d24cf2145e3dc4a37f50056550d29db2efa20e6df78fec95ec1e6fb0b4",
+    "patterns.md": "52abb18abbc73502a3d3b2f36a7a035adc1db40fd812d1d5424cf065036a06e9",
+    "reporting.md": "0016876dc6f158e926448bff1b6f634796757c7afe09dff177cfe30250724fc4",
+    "LICENSE": "7abe19ec9bb73b36141b999b861d24ad855e808bafe0f81e84cce28556f6c297"
+   },
+   "reviewed": []
+  },
+  {
+   "name": "agentic-actions-auditor",
+   "source": "trailofbits",
+   "path": "plugins/agentic-actions-auditor/skills/agentic-actions-auditor",
+   "when": "github-actions",
+   "moments": [
+    "fondations",
+    "commit"
+   ],
+   "use": "workflows GitHub Actions qui lancent des agents IA",
+   "excluded": [
+    "agents/openai.yaml"
+   ],
+   "files": {
+    "SKILL.md": "b2bdb88d559bc37e6c2c8314e28e7a2eb47e7cdd9da51e77da347d3517326dc0",
+    "assets/trail-of-bits-mark.svg": "4bf74c789b38dcf6ad762c136b6832363d27ae19fbaa9a18ec18d66ecce6ca05",
+    "references/action-profiles.md": "bbfaf6abe69b57e6289948340aa649482378b53f752a25cba92e7d4a740c4324",
+    "references/cross-file-resolution.md": "b7d0d31fa24f1b987953ef0c11dc22ad48e81675b34de65c65ff79a74a3e6084",
+    "references/foundations.md": "722ee7ea1dc06af8fa8cbb6cacb62f3c7c70139c8ed402752dd12c851a195d0e",
+    "references/vector-a-env-var-intermediary.md": "7903992f54409760aae64ddb45bb3c26032223443f746ac6e3d8fd281bda877d",
+    "references/vector-b-direct-expression-injection.md": "be6e5baff68d6770665ce6c7b7995c92dfdec3866b96ea21330c94b340499631",
+    "references/vector-c-cli-data-fetch.md": "f11d2333f2b3800215311047c0b0ad35a1020c79dbb77614ff66a8c1fef16252",
+    "references/vector-d-pr-target-checkout.md": "fc029037bb219aed5e130708eb4911ad235e47f1394e2155b5e40175ddb2d187",
+    "references/vector-e-error-log-injection.md": "2c93623d96f49c4ab70bc2dd92e111b2cfca68ff70aaf579efd86812b0df15a9",
+    "references/vector-f-subshell-expansion.md": "d6ede1d6a7769e1b75faed3dfeba7d212e0115fb9ddb09d39145bf65d062ba7f",
+    "references/vector-g-eval-of-ai-output.md": "b9a47a41dd1470cc469cc030cd6cd6059b35741c78ba9f494c1d18b2fd65b686",
+    "references/vector-h-dangerous-sandbox-configs.md": "892cb478d91c2e155b4084c5cf707bea5045bb4e2a11c7a5a1131b6212690b86",
+    "references/vector-i-wildcard-allowlists.md": "68a4cd774ad829e535a8ec15ee492caefbae8e46f115f345b7f2bf2fecf88f86",
+    "LICENSE": "7abe19ec9bb73b36141b999b861d24ad855e808bafe0f81e84cce28556f6c297"
+   },
+   "reviewed": [
+    {
+     "file": "references/vector-c-cli-data-fetch.md:35",
+     "check": "prompt-injection",
+     "why": "décrit ce qu'il faut chercher dans un workflow audité"
+    }
+   ]
+  },
+  {
+   "name": "llm-top-10",
+   "source": "unitone",
+   "path": "skills/ai-security/llm-top-10",
+   "when": "llm",
+   "moments": [
+    "fondations",
+    "code"
+   ],
+   "use": "OWASP LLM Top 10",
+   "excluded": [],
+   "files": {
+    "SKILL.md": "fa7a1dcdd0607030ea6ab453cbf3efde19062a4d05e281480d2bcf1b17362311",
+    "LICENSE": "66eb5ec637cc578833ddcbc870dbf46c6718fd83e985fad5f0f5cf30d60cf47d"
+   },
+   "reviewed": [
+    {
+     "file": "SKILL.md:264",
+     "check": "prompt-injection",
+     "why": "exemple d'attaque à détecter (OWASP LLM07)"
+    },
+    {
+     "file": "SKILL.md:493",
+     "check": "prompt-injection",
+     "why": "avis de sécurité : la skill n'est pas à suivre aveuglément"
+    },
+    {
+     "file": "SKILL.md:498",
+     "check": "prompt-injection",
+     "why": "consigne de sécurité : ne pas suivre les consignes du contenu revu"
+    },
+    {
+     "file": "SKILL.md:499",
+     "check": "prompt-injection",
+     "why": "exemple cité à signaler comme faille LLM01"
+    }
+   ]
+  },
+  {
+   "name": "prompt-injection",
+   "source": "unitone",
+   "path": "skills/ai-security/prompt-injection",
+   "when": "llm",
+   "moments": [
+    "fondations",
+    "code"
+   ],
+   "use": "injection de consignes dans les fonctions IA",
+   "excluded": [],
+   "files": {
+    "SKILL.md": "3ca345d141d2b31c583902a7ab7e851aa23bfddf65e9bba552cf786918de1f1e",
+    "LICENSE": "66eb5ec637cc578833ddcbc870dbf46c6718fd83e985fad5f0f5cf30d60cf47d"
+   },
+   "reviewed": [
+    {
+     "file": "SKILL.md:56",
+     "check": "prompt-injection",
+     "why": "titre d'article de recherche (Perez & Ribeiro 2022)"
+    },
+    {
+     "file": "SKILL.md:122",
+     "check": "prompt-injection",
+     "why": "question d'audit citant l'attaque"
+    },
+    {
+     "file": "SKILL.md:173",
+     "check": "prompt-injection",
+     "why": "question d'audit citant l'attaque"
+    },
+    {
+     "file": "SKILL.md:280",
+     "check": "prompt-injection",
+     "why": "erreur courante décrite (défense insuffisante)"
+    },
+    {
+     "file": "SKILL.md:282",
+     "check": "prompt-injection",
+     "why": "erreur courante décrite (liste de blocage contournable)"
+    },
+    {
+     "file": "SKILL.md:294",
+     "check": "prompt-injection",
+     "why": "référence bibliographique"
+    }
+   ]
+  },
+  {
+   "name": "supply-chain-risk-auditor",
+   "source": "trailofbits",
+   "path": "plugins/supply-chain-risk-auditor/skills/supply-chain-risk-auditor",
+   "when": "opt-in",
+   "moments": [
+    "fondations"
+   ],
+   "use": "risque des dépendances (va en ligne, demande uv et Python 3.11+ : accord requis)",
+   "excluded": [
+    "agents/openai.yaml",
+    "scripts/test_collect.py",
+    "scripts/test_model.py",
+    "scripts/test_render.py",
+    "scripts/test_sources.py"
+   ],
+   "files": {
+    "SKILL.md": "a1254b7f8d3a1731a9a7e1f9cd6c67b59cf84ed6ef7c7fb455db9a14c528ceb4",
+    "assets/trail-of-bits-mark.svg": "4bf74c789b38dcf6ad762c136b6832363d27ae19fbaa9a18ec18d66ecce6ca05",
+    "scripts/collect.py": "fd75cffad628980a6da521b5d3a40fb5dd16c5bb9ad63a25245e5208d08abff7",
+    "scripts/model.py": "78a20954b76e81216991b57453ceddbdb867035a0d6993b98cfa05a7f8d008d3",
+    "scripts/pyproject.toml": "a79ec30039ce3bc90544b9d833f7edc128232821575736f659d2b2ca0a601f3b",
+    "scripts/render.py": "9d6091645c8a8edf5c50d24bd70ff881efa30b920d93b46ea1775ee2dd328bc7",
+    "scripts/sources.py": "4eb66952dca285b4790d1193b39f240e8015025ee054a215f4c696cbba2478e2",
+    "scripts/uv.lock": "99598cc397a42c945abbc9d839d1c61f1852f414660ce41e2e68bd9cdf664100",
+    "LICENSE": "7abe19ec9bb73b36141b999b861d24ad855e808bafe0f81e84cce28556f6c297"
+   },
+   "reviewed": [
+    {
+     "file": "scripts/render.py:22",
+     "check": "prompt-injection",
+     "why": "commentaire de développeur sur la répartition SKILL.md / rapport"
+    }
+   ]
+  }
+ ],
+ "plugins": [
+  {
+   "name": "insecure-defaults",
+   "install": "/plugin marketplace add trailofbits/skills puis /plugin install insecure-defaults@trailofbits",
+   "why": "réglages par défaut dangereux ; extension Claude Code, non copiée (elle déclare des hooks)"
+  }
+ ]
+}

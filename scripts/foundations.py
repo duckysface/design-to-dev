@@ -101,6 +101,14 @@ def version(s):
     return tuple(int(x) for x in (nums + ["0", "0", "0"])[:3]) if nums else None
 
 
+def kit_trusted(root):
+    """Fichiers intacts du kit de sécurité (empreintes épinglées) : leurs exemples d'attaque cités ont été revus."""
+    spec = importlib.util.spec_from_file_location("d2d_security_kit", Path(__file__).with_name("security_kit.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.trusted_files(root)
+
+
 def load_deps_audit():
     spec = importlib.util.spec_from_file_location("d2d_deps_audit", Path(__file__).with_name("deps_audit.py"))
     mod = importlib.util.module_from_spec(spec)
@@ -427,7 +435,8 @@ def prepare(target, out, default):
         raise SystemExit(f"Dossier introuvable : {root}")
     out = resolve_out(root, out, default)
     skip = {out.resolve().relative_to(root).as_posix()} if out.resolve().is_relative_to(root) else set()
-    skip |= {"docs/security/fondations.md", "docs/security/dependances.md"}
+    skip |= {"docs/security/fondations.md", "docs/security/dependances.md", "docs/security/kit-securite.md"}
+    skip |= kit_trusted(root)
     files = [(p, read(p)) for p in walk(root, skip) if p.suffix.lower() in TEXT_EXT or p.name.lower().startswith("readme")]
     return root, out, skip, files
 

@@ -21,6 +21,7 @@ Les scripts lisent les fichiers du dossier que tu leur donnes et écrivent :
 | Le dossier temporaire de l'agent | Inventaires et mémoire de préproduction, avant que la cible existe |
 | Ton dossier de skills | Les fichiers de la skill elle-même (`~/.claude/skills`, `~/.agents/skills`) |
 | La config de l'agent dans le projet | Hooks dans `.claude/settings.json` et `.codex/hooks.json` (seules nos entrées sont ajoutées) |
+| `.claude/skills/` du projet | Le kit de sécurité, si tu l'installes (`security-kit install`) |
 
 ## Quand le réseau est utilisé
 
@@ -32,6 +33,7 @@ design-to-dev ne contacte aucun serveur de lui-même. Le réseau sert seulement 
 | `deps --online`, `foundations --online` | [OSV.dev](https://osv.dev), les registres (npm, PyPI, crates.io, Packagist, proxy Go, RubyGems, pub.dev) et [endoflife.date](https://endoflife.date) : **seuls des noms et versions de paquets publics** sont envoyés, jamais ton code ni tes fichiers |
 | `foundations --run-audits` | Les registres de `npm audit`, `cargo audit` ou `osv-scanner`, s'ils sont installés |
 | Installation d'une skill compagnon (superpowers, security-audit) | GitHub, **uniquement avec ton accord** |
+| `security-kit install` | codeload.github.com, **uniquement avec ton accord** : téléchargement des archives publiques aux commits épinglés ; rien n'est envoyé |
 
 ## Ton agent d'IA
 
