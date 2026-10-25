@@ -27,7 +27,7 @@ Chaque fichier reçoit une action : `keep` (même chemin), `move` (nouveau chemi
 ### Claude Design / export « design system » de claude.ai
 | Fichier | Décision par défaut |
 |---|---|
-| `SKILL.md` racine (skill de marque) | `move` → `.claude/skills/<ds>/SKILL.md` (corriger les chemins vers `docs/design-system/README.md`) |
+| `SKILL.md` racine (skill de marque) | `move` → `.agents/skills/<ds>/SKILL.md` (recopiée dans `.claude/skills/` pour Claude Code) (corriger les chemins vers `docs/design-system/README.md`) |
 | `readme.md` | `move` → `docs/design-system/README.md` (et s'en servir pour le README racine) |
 | `styles.css` (point d'entrée `@import`) | `move` → `src/styles/index.css` |
 | `tokens/*.css` | `move` → `src/styles/tokens/` |

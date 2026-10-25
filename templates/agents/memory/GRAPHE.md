@@ -1,25 +1,26 @@
 # Mémoire graphe du projet (OBLIGATOIRE)
 
-Ce projet tient un graphe de connaissances dans `.claude/graph/graph.json`. Il complète le dossier `.claude/memory/` (journal, état, décisions) : la mémoire texte dit *pourquoi* et *où on en est*, le graphe dit *qui dépend de quoi*.
+Ce projet tient un graphe de connaissances dans `.agents/graph/graph.json`. Il est partagé par tous les agents du projet et complète le dossier `.agents/memory/` (journal, état, décisions) : la mémoire texte dit *pourquoi* et *où on en est*, le graphe dit *qui dépend de quoi*.
 
-Les hooks enregistrent automatiquement la structure : fichiers créés ou modifiés, imports entre fichiers (JS/TS, Python, et `src`/`href`/`@import`/`url()` en HTML et CSS), agents, skills et commandes invoqués, sessions, commandes Bash (secrets masqués). Tu n'as pas à le faire à la main. Ta responsabilité : interroger le graphe avant d'agir, et y ajouter les faits durables que les hooks ne peuvent pas deviner.
+Les hooks enregistrent automatiquement la structure : fichiers créés ou modifiés, imports entre fichiers (JS/TS, Python, et `src`/`href`/`@import`/`url()` en HTML et CSS), agents, skills et commandes invoqués, sessions (avec l'agent qui les a ouvertes), commandes shell (secrets masqués). Les modifications faites par Codex (`apply_patch`) sont reconnues comme celles de Claude Code. Tu n'as pas à le faire à la main. Ta responsabilité : interroger le graphe avant d'agir, et y ajouter les faits durables que les hooks ne peuvent pas deviner.
 
 ## 1. Commandes
 
-- Interroger : `python3 .claude/hooks/graph_hook.py query <terme>` (chemin, nom d'agent, nom de skill, sujet)
-- Ajouter un fait : `python3 .claude/hooks/graph_hook.py note <sujet> "<fait court et vérifiable>"`
-- Réindexer tout le projet (après un gros déplacement) : `python3 .claude/hooks/graph_hook.py index`
+- Interroger : `python3 .agents/hooks/memory_hook.py query <terme>` (chemin, nom d'agent, nom de skill, sujet)
+- Ajouter un fait : `python3 .agents/hooks/memory_hook.py note <sujet> "<fait court et vérifiable>"`
+- Réindexer tout le projet (après un gros déplacement) : `python3 .agents/hooks/memory_hook.py index` (`--prune` oublie les fichiers disparus)
+- Chercher dans la mémoire texte et les faits : `python3 .agents/hooks/memory_hook.py recall "<sujet>"`
 - Ne jamais éditer `graph.json` à la main. Passer uniquement par ces commandes.
 
 ## 2. Au démarrage de chaque session
 
-1. Lire `.claude/memory/etat.md` (règles du protocole mémoire texte).
+1. Lire `.agents/memory/etat.md` (règles du protocole mémoire texte).
 2. Interroger le graphe sur le sujet de la tâche demandée.
 3. Annoncer en 3 lignes maximum : l'état, les fichiers et agents/skills concernés, la prochaine étape.
 
 ## 3. Avant de modifier un fichier
 
-- Lancer `query <chemin>` pour voir ce qui l'importe (`IMPORTS`) et qui l'a déjà touché (`TOUCHED`).
+- Lancer `query <chemin>` pour voir ce qui l'importe (`IMPORTS`) et qui l'a déjà touché (`TOUCHED`). Avec Claude Code, le hook `PreToolUse` injecte automatiquement les dépendants et les faits connus avant chaque modification.
 - Si un fichier importé est impacté, le signaler avant de continuer.
 - Un fichier sans dépendant connu n'est pas forcément inutile : vérifier avec `grep` avant de le supprimer.
 
@@ -27,10 +28,10 @@ Les hooks enregistrent automatiquement la structure : fichiers créés ou modifi
 
 Ces dossiers sont la configuration du projet. Traite-les avec plus de soin que le code applicatif.
 
-- **Avant de créer ou modifier** un agent (`.claude/agents/`), une skill (`.claude/skills/`), une commande (`.claude/commands/`) ou un hook (`.claude/hooks/`) : `query <nom>` pour vérifier qu'il n'existe pas déjà ou qu'un élément similaire ne fait pas le même travail.
+- **Avant de créer ou modifier** un agent (`.claude/agents/`, `.codex/agents/`), une skill (`.agents/skills/`, `.claude/skills/`), une commande (`.claude/commands/`) ou un hook (`.agents/hooks/`, `.claude/settings.json`, `.codex/hooks.json`) : `query <nom>` pour vérifier qu'il n'existe pas déjà ou qu'un élément similaire ne fait pas le même travail.
 - **Après** : `note <nom-de-l-élément> "<rôle en une phrase, déclencheurs, outils autorisés>"`.
 - Une skill ou un agent doit toujours avoir un rôle unique. Si deux éléments se chevauchent, le signaler à l'utilisateur plutôt que de créer un doublon.
-- Ne jamais modifier `settings.json` pour désactiver un hook sans demander la permission explicite de l'utilisateur.
+- Ne jamais modifier `.claude/settings.json` ou `.codex/hooks.json` pour désactiver un hook sans demander la permission explicite de l'utilisateur.
 
 ## 5. Ce qui mérite un `note`
 
@@ -45,7 +46,7 @@ Ne pas noter : les états temporaires, les hypothèses non vérifiées, les secr
 
 ## 6. Cohérence entre les mémoires
 
-- Quand une décision apparaît à la fois dans `.claude/memory/decisions.md` et dans le graphe, les deux doivent rester cohérents. En cas de contradiction, demander à l'utilisateur laquelle est à jour.
+- Quand une décision apparaît à la fois dans `.agents/memory/decisions.md` et dans le graphe, les deux doivent rester cohérents. En cas de contradiction, demander à l'utilisateur laquelle est à jour.
 - Si un fichier ou un agent disparaît du dépôt, le signaler : le graphe garde l'ancien nœud jusqu'à la prochaine revue.
 
 ## 7. Reprise après interruption

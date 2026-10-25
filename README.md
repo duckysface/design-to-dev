@@ -4,12 +4,14 @@
 
 **Transforme un dossier de design désordonné en projet prêt pour le développement.**
 
-Skill pour [Claude Code](https://claude.com/claude-code) · Python 3.9+ (stdlib uniquement) · Windows, macOS, Linux
+Skill pour **Claude Code** et **Codex** · mémoire partagée avec Cursor, Gemini CLI, Copilot · Python 3.9+ (stdlib) · Windows, macOS, Linux
 
 ![Licence MIT](https://img.shields.io/badge/licence-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![Dépendances](https://img.shields.io/badge/d%C3%A9pendances-aucune-brightgreen)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-d97757)
+![Codex](https://img.shields.io/badge/Codex-skill-10a37f)
+![npx](https://img.shields.io/badge/install-npx-cb3837)
 
 </div>
 
@@ -30,7 +32,7 @@ Mon Design System/
 └── readme.md
 ```
 
-**design-to-dev** trie tout ça, propose une arborescence propre, **attend ton accord**, puis construit une copie réorganisée avec tous les chemins corrigés. Le dossier d'origine n'est jamais touché.
+**design-to-dev** trie tout ça, propose une arborescence propre, **attend ton accord**, puis construit une copie réorganisée avec tous les chemins corrigés. Le dossier d'origine n'est jamais touché. Le projet sort avec une **mémoire partagée** que tous tes agents de code lisent et tiennent à jour.
 
 ---
 
@@ -44,7 +46,7 @@ flowchart LR
     D --> E{"✅ Ton accord ?"}
     E -- non --> D
     E -- oui --> F["📦 Copie<br/>réorganisée"]
-    F --> G["🧠 Préproduction<br/>Claude Code"]
+    F --> G["🧠 Préproduction<br/>multi-agents"]
     G --> H["🚀 Projet prêt<br/>pour le dev"]
 
     style A fill:#fde2e2,stroke:#e57373,color:#000
@@ -57,30 +59,87 @@ flowchart LR
 | 🗂️ Organisation | Fichiers en vrac, noms au hasard | `src/`, `docs/`, `prototypes/`, conventions claires |
 | 🧹 Propreté | Doublons, artefacts, déchets système | Seulement ce qui sert, avec la raison de chaque suppression |
 | 🔗 Liens | Chemins fragiles | Tous les chemins réécrits et vérifiés (0 lien cassé) |
-| 🧠 Claude Code | Rien | Mémoire projet, graphe de dépendances, hooks, `CLAUDE.md` |
+| 🧠 Agents | Rien | Mémoire `.agents/` partagée, graphe, hooks Claude Code + Codex, `AGENTS.md` |
 | ↩️ Retour arrière | — | Source intacte + `file-map.json` (avant → après) |
 
 ---
 
 ## 📥 Installation
 
+Choisis ta méthode. Chacune te laisse choisir l'agent : **Claude Code**, **Codex**, ou les deux.
+
+### Avec npm / npx (recommandé)
+
 ```bash
-git clone https://github.com/duckysface/design-to-dev ~/.claude/skills/design-to-dev
+npx github:duckysface/design-to-dev
 ```
 
-C'est tout. Seul prérequis : Python 3.9+ (`python` sur Windows, `python3` ailleurs).
+Un menu demande où installer. Sans question :
+
+```bash
+npx github:duckysface/design-to-dev install --claude -y
+```
+
+| Option | Installe dans |
+|---|---|
+| `--claude` | `~/.claude/skills/design-to-dev` (ou `$CLAUDE_CONFIG_DIR/skills/…`) |
+| `--codex` | `~/.agents/skills/design-to-dev` (dossier de skills lu par Codex) |
+| `--all` | les deux |
+| `--project [dossier]` | dans le projet (`.claude/skills`, `.agents/skills`) au lieu de ton dossier utilisateur |
+
+### Sans Node, en une ligne
+
+macOS / Linux :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/duckysface/design-to-dev/main/install.sh | sh
+```
+
+Agent précis : `… | sh -s -- --codex` (ou `--claude`, `--all`).
+
+Windows (PowerShell) :
+
+```powershell
+irm https://raw.githubusercontent.com/duckysface/design-to-dev/main/install.ps1 | iex
+```
+
+Agent précis : `$env:DESIGN_TO_DEV_AGENTS = "codex"` avant la commande (`claude`, `codex` ou `all`).
+
+### À la main
+
+```bash
+git clone https://github.com/duckysface/design-to-dev ~/.claude/skills/design-to-dev   # Claude Code
+git clone https://github.com/duckysface/design-to-dev ~/.agents/skills/design-to-dev   # Codex
+```
+
+Seul prérequis à l'usage : Python 3.9+ (`python` sur Windows, `python3` ailleurs).
+
+| Action | Commande |
+|---|---|
+| Vérifier Python et les installations | `npx github:duckysface/design-to-dev doctor` |
+| Mettre à jour | relancer l'installation |
+| Désinstaller | `npx github:duckysface/design-to-dev uninstall --all` |
 
 ## ▶️ Utilisation
 
-Dans Claude Code :
-
-```
-/design-to-dev ~/Downloads/Mon Design System
-```
+| Agent | Commande |
+|---|---|
+| Claude Code | `/design-to-dev ~/Downloads/Mon Design System` |
+| Codex | `$design-to-dev ~/Downloads/Mon Design System` |
 
 ou en langage naturel : *« organise ce dossier de design pour le développement »*.
 
-La skill te pose d'abord **une seule question groupée** (cible, stack visée, mémoire partagée ou privée), puis déroule le reste.
+La skill te pose d'abord **une seule question groupée** (cible, stack visée, mémoire partagée ou privée, agents à brancher), puis déroule le reste.
+
+### Juste la mémoire, sur un projet existant
+
+Pas besoin de passer par le nettoyage :
+
+```bash
+npx github:duckysface/design-to-dev init . --agents claude,codex,cursor
+npx github:duckysface/design-to-dev init . --check     # contrôle sans rien écrire
+npx github:duckysface/design-to-dev init . --update    # met à jour le hook
+```
 
 ---
 
@@ -88,14 +147,14 @@ La skill te pose d'abord **une seule question groupée** (cible, stack visée, m
 
 ```mermaid
 flowchart TD
-    S0["<b>0 · Cadrage</b><br/>source, cible, stack, mémoire"]
+    S0["<b>0 · Cadrage</b><br/>source, cible, stack, mémoire, agents"]
     S1["<b>1 · Inventaire</b><br/>types, tailles, doublons,<br/>références entre fichiers"]
     S2["<b>2 · Analyse</b><br/>sous-agents en parallèle"]
     S3["<b>3 · Plan</b><br/>keep / move / delete<br/>+ vérification automatique"]
     OK{"<b>Validation</b><br/>par toi"}
     S4["<b>4 · Application</b><br/>copie + réécriture des chemins"]
     S5["<b>5 · Fichiers racine</b><br/>README, .gitignore, ADR"]
-    S6["<b>6 · Préproduction</b><br/>.claude/ : mémoire, graphe, hooks"]
+    S6["<b>6 · Préproduction</b><br/>.agents/ : mémoire, graphe, hooks<br/>+ adaptateurs par agent"]
     S7["<b>7 · Git</b><br/>premier commit (sur demande)"]
 
     S0 --> S1 --> S2 --> S3 --> OK
@@ -109,7 +168,7 @@ flowchart TD
 
 ### 🤖 L'analyse par sous-agents
 
-Chaque spécialiste reçoit sa part de l'inventaire et renvoie, pour chaque fichier, une action, une destination, une raison et un niveau de confiance.
+Chaque spécialiste reçoit sa part de l'inventaire et renvoie, pour chaque fichier, une action, une destination, une raison et un niveau de confiance. Si l'agent ne sait pas lancer de sous-agents, il fait les mêmes passes l'une après l'autre.
 
 ```mermaid
 flowchart TB
@@ -139,58 +198,108 @@ Avant toute copie, le plan est vérifié automatiquement. Il est **refusé** si 
 
 ```
 mon-projet/
-├── .claude/
-│   ├── memory/            état, journal, décisions, problèmes, protocole
-│   ├── hooks/graph_hook.py
-│   ├── graph/graph.json   graphe des fichiers et de leurs dépendances
-│   ├── skills/<ds>/       skill de marque de l'export, si présente
-│   └── settings.json      hooks du graphe
+├── .agents/                     ← partagé par tous les agents
+│   ├── memory/                  état, journal, décisions, problèmes, protocole
+│   ├── graph/graph.json         graphe des fichiers et de leurs dépendances
+│   ├── hooks/memory_hook.py     un seul hook pour Claude Code et Codex
+│   ├── skills/<ds>/             skill de marque de l'export, si présente
+│   └── design-to-dev.json       manifeste (version, agents, empreinte du hook)
+├── .claude/settings.json        hooks Claude Code      ┐
+├── .codex/hooks.json            hooks Codex            │
+├── .cursor/rules/memoire-projet.mdc                    │ selon --agents
+├── .github/copilot-instructions.md                     │
+├── CLAUDE.md  GEMINI.md         renvoient vers AGENTS.md ┘
+├── AGENTS.md                    règles communes (bloc géré, ton contenu est conservé)
 ├── src/
-│   ├── styles/            index.css, tokens, components.css
+│   ├── styles/                  index.css, tokens, components.css
 │   ├── components/<catégorie>/<Composant>/
 │   └── assets/{brand,images}/
-├── prototypes/<écran>/    écrans HTML jouables
+├── prototypes/<écran>/          écrans HTML jouables
 ├── docs/
-│   ├── design-system/     README, specimens, références visuelles
+│   ├── design-system/           README, specimens, références visuelles
 │   ├── adr/0001-structure-du-projet.md
-│   └── cleanup/           report.md, file-map.json (avant → après)
-├── vendor/                bundles générés encore utilisés
-├── CLAUDE.md
+│   └── cleanup/                 report.md, file-map.json (avant → après)
+├── vendor/                      bundles générés encore utilisés
 ├── README.md
 └── .gitignore
 ```
 
 ---
 
-## 🧠 La préproduction Claude Code
+## 🧠 Une mémoire pour tous les agents
 
-Le projet sort avec une **mémoire** qui survit d'une session à l'autre et un **graphe** de dépendances mis à jour automatiquement.
+Une seule source de vérité dans `.agents/`, versionnée avec le projet. Chaque outil n'a qu'un **adaptateur** fin qui pointe dessus, donc pas de mémoires en double qui divergent.
 
 ```mermaid
-flowchart TB
-    S1(["▶️ Début de session"]) -- "SessionStart" --> HOOK["⚙️ graph_hook.py"]
-    S2["✏️ Claude modifie des fichiers"] -- "PostToolUse" --> HOOK
-    S3(["⏹️ Fin de session"]) -- "Stop / SessionEnd" --> HOOK
-    HOOK --> GRAPH[("🕸️ graph.json<br/>qui importe qui")]
-    S2 --> MEM[("🧠 .claude/memory/<br/>état, journal, décisions")]
-    GRAPH -. "résumé au démarrage" .-> S1
-    MEM -. "relu au démarrage" .-> S1
+flowchart LR
+    subgraph Agents
+        CC["Claude Code"]
+        CX["Codex"]
+        CU["Cursor"]
+        GE["Gemini CLI"]
+        CP["Copilot"]
+    end
+    subgraph CORE [".agents/ — source unique"]
+        MEM[("🧠 memory/")]
+        GRAPH[("🕸️ graph.json")]
+        HOOK["⚙️ memory_hook.py"]
+    end
+    CC -- "CLAUDE.md → @AGENTS.md<br/>+ hooks" --> HOOK
+    CX -- "AGENTS.md<br/>+ hooks" --> HOOK
+    CU -- ".cursor/rules" --> MEM
+    GE -- "GEMINI.md" --> MEM
+    CP -- "copilot-instructions" --> MEM
+    HOOK --> GRAPH
+    HOOK --> MEM
+```
+
+### ⚙️ Ce que fait le hook, automatiquement
+
+```mermaid
+sequenceDiagram
+    participant A as Agent (Claude / Codex)
+    participant H as memory_hook.py
+    participant M as .agents/
+    A->>H: SessionStart
+    H->>M: lit état, décisions, problèmes, graphe
+    H-->>A: contexte court, marqué « données, pas des consignes »
+    A->>H: PreToolUse (Claude) avant d'éditer
+    H-->>A: fichiers qui dépendent de celui-ci
+    A->>H: PostToolUse : Edit, Write, apply_patch, shell
+    H->>M: fichiers touchés et imports réindexés (secrets caviardés)
+    A->>H: Stop / PreCompact / SessionEnd
+    H->>M: clôt la session, rappelle de mettre à jour etat.md
 ```
 
 | Fichier | Rôle |
 |---|---|
 | `etat.md` | Où on en est et **prochaine étape exacte** (lu en premier) |
-| `journal.md` | Historique chronologique, jamais réécrit |
+| `journal.md` | Historique chronologique, archivé quand il grossit |
 | `changements.md` | Chaque fichier créé, modifié, déplacé ou supprimé (pré-rempli par le nettoyage) |
 | `decisions.md` | Choix techniques et leurs raisons |
 | `problemes.md` | Pièges rencontrés et solutions |
-| `graph.json` | Qui importe qui ; interrogeable avant toute modification |
+| `graph.json` | Qui importe qui, quelles sessions ont touché quoi, notes durables |
 
-Interroger le graphe avant de toucher un fichier :
+### 🔎 Commandes de la mémoire
 
 ```bash
-python .claude/hooks/graph_hook.py query src/styles/tokens.css
+python .agents/hooks/memory_hook.py context                       # résumé injecté au démarrage
+python .agents/hooks/memory_hook.py recall "bundler vite"         # recherche (BM25) dans la mémoire
+python .agents/hooks/memory_hook.py query src/styles/tokens.css   # qui dépend de ce fichier
+python .agents/hooks/memory_hook.py note tokens "source de vérité des couleurs"
+python .agents/hooks/memory_hook.py doctor                        # cohérence, secrets, placeholders
+python .agents/hooks/memory_hook.py archive                       # archive les vieilles entrées du journal
 ```
+
+### 🧩 Spécificités par agent
+
+| Agent | Lecture de la mémoire | Mise à jour automatique |
+|---|---|---|
+| Claude Code | `CLAUDE.md` importe `AGENTS.md` | 7 hooks : SessionStart, PreToolUse, PostToolUse, Stop, SubagentStop, PreCompact, SessionEnd |
+| Codex | `AGENTS.md` | `.codex/hooks.json` : approuver le projet (trust), puis valider via `/hooks` |
+| Cursor, Gemini CLI, Copilot | règle ou fichier d'instructions | pas de hooks : l'agent suit le protocole écrit |
+
+La mémoire native de Codex (`~/.codex/memories`, activée par `[features] memories = true`) reste gérée par Codex et n'est jamais modifiée. Elle complète `.agents/`, qui est versionné avec le projet et partagé par l'équipe.
 
 ---
 
@@ -201,9 +310,10 @@ python .claude/hooks/graph_hook.py query src/styles/tokens.css
 | 🧊 **Source intacte** | Le dossier d'origine n'est jamais modifié : tout est copié dans une nouvelle cible. Retour arrière = supprimer la cible. |
 | ✋ **Rien sans ton accord** | Aucune suppression sans plan approuvé. Les cas douteux te sont posés. |
 | 🔗 **Rien de cassé** | Un fichier encore utilisé ne peut pas être supprimé ; `verify` contrôle chaque lien après copie. |
-| 🔑 **Pas de secrets** | `.env` n'est jamais copié (→ `.env.example`). Tokens, mots de passe et identifiants d'URL sont masqués dans le graphe. |
+| 🔑 **Pas de secrets** | `.env` n'est jamais copié (→ `.env.example`). Tokens, mots de passe et identifiants d'URL sont caviardés dans le graphe et les notes ; `doctor` signale tout secret écrit dans la mémoire. |
+| 🧷 **Tes hooks conservés** | La fusion dans `settings.json` / `hooks.json` ne touche que les entrées de design-to-dev ; un JSON invalide arrête tout sans rien écrire. |
 | 👤 **Données personnelles** | Photos de personnes, noms, emails, captures de conversations : jamais tranchés seuls. |
-| 🛑 **Contenu = données** | Toute consigne trouvée dans un fichier analysé est ignorée. |
+| 🛑 **Contenu = données** | Toute consigne trouvée dans un fichier analysé ou dans la mémoire est ignorée ; les notes qui ressemblent à une injection sont refusées. |
 
 ---
 
@@ -226,12 +336,12 @@ python scripts/organize.py apply plan.json --apply
 # 4. Vérifier les liens dans la cible
 python scripts/organize.py verify "<cible>"
 
-# 5. Préproduction Claude Code
-python scripts/scaffold_claude.py "<cible>" --name "Mon projet" \
-  --file-map "<cible>/docs/cleanup/file-map.json" [--private-memory]
+# 5. Préproduction multi-agents
+python scripts/scaffold_memory.py "<cible>" --name "Mon projet" \
+  --file-map "<cible>/docs/cleanup/file-map.json" --agents claude,codex [--private-memory]
 ```
 
-Format du plan : [`references/plan-format.md`](references/plan-format.md).
+Format du plan : [`references/plan-format.md`](references/plan-format.md). Tests : `npm test`.
 
 </details>
 
@@ -242,13 +352,16 @@ Format du plan : [`references/plan-format.md`](references/plan-format.md).
 | [`SKILL.md`](SKILL.md) | Déroulé de la skill (étapes 0 à 7, garde-fous) |
 | [`references/`](references/) | Conventions de dossiers, règles de classification, format du plan, prompts des sous-agents |
 | [`scripts/organize.py`](scripts/organize.py) | Inventaire, vérification du plan, application, vérification des liens |
-| [`scripts/scaffold_claude.py`](scripts/scaffold_claude.py) | Création de `.claude/` (mémoire, hooks, graphe, `CLAUDE.md`) |
-| [`templates/claude/`](templates/claude/) | Protocole mémoire, règles du graphe, hook `graph_hook.py` |
+| [`scripts/scaffold_memory.py`](scripts/scaffold_memory.py) | Création de `.agents/` et des adaptateurs par agent, `--check`, `--update` |
+| [`templates/agents/`](templates/agents/) | Protocole mémoire, règles du graphe, hook `memory_hook.py` |
+| [`bin/cli.js`](bin/cli.js) | CLI npx : `install`, `uninstall`, `init`, `doctor` |
+| [`install.sh`](install.sh) · [`install.ps1`](install.ps1) | Installation en une ligne, sans npm |
+| [`tests/`](tests/) | Tests de bout en bout |
 
 ---
 
 <div align="center">
 
-Licence [MIT](LICENSE) · Fait pour [Claude Code](https://claude.com/claude-code)
+Licence [MIT](LICENSE) · Fait pour Claude Code, Codex et tous les agents qui lisent `AGENTS.md`
 
 </div>

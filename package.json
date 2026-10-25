@@ -1,0 +1,41 @@
+{
+  "name": "design-to-dev",
+  "version": "2.0.0",
+  "description": "Skill Claude Code et Codex : transforme un dossier de design en projet prêt pour le dev, avec une mémoire projet partagée entre agents.",
+  "bin": {
+    "design-to-dev": "bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "SKILL.md",
+    "scripts/*.py",
+    "references/",
+    "templates/",
+    "install.sh",
+    "install.ps1",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node bin/cli.js --version && python tests/test_memory.py"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "agent-skills",
+    "skill",
+    "design-system",
+    "agent-memory",
+    "cross-agent-memory",
+    "agents-md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/duckysface/design-to-dev.git"
+  },
+  "homepage": "https://github.com/duckysface/design-to-dev#readme",
+  "license": "MIT"
+}

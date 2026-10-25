@@ -62,7 +62,7 @@ Mission : images, logos, SVG, polices, vidéos, captures.
 <bloc commun>
 Mission : documentation, specimens HTML, configs, manifests, fichiers propres à l'outil de design, déchets.
 1. readme/README du design system → docs/design-system/README.md. Extrait-en en « ### Remarques » 5 lignes utiles pour le README racine (ce qu'est le produit, la stack, comment voir les maquettes).
-2. SKILL.md racine d'un outil de design → .claude/skills/<nom-du-ds>/SKILL.md ; indique dans reason les chemins internes à corriger.
+2. SKILL.md racine d'un outil de design → .agents/skills/<nom-du-ds>/SKILL.md ; indique dans reason les chemins internes à corriger.
 3. Specimens (guidelines/*.html, *.card.html) → docs/design-system/specimens/ ; vérifie leurs refs_out (styles.css, assets) pour que apply les réécrive.
 4. Manifests, vignettes, configs d'export : delete sauf si un fichier gardé les lit (refs_in) ou s'ils ont une valeur d'outillage (lint) → config/ en review.
 5. Déchets OS, logs, backups, .env réels (ne jamais copier un .env : delete + note « créer .env.example »).

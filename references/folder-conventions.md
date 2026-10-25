@@ -9,8 +9,8 @@ mon-projet/
 ├── .gitignore
 ├── .env.example           # Variables d'environnement (jamais le vrai .env)
 ├── package.json / pyproject.toml / go.mod / …
-├── CLAUDE.md              # Court, renvoie vers .claude/memory/
-├── .claude/               # memory/, hooks/, graph/, skills/, settings.json
+├── AGENTS.md · CLAUDE.md  # Instructions agents, renvoient vers .agents/memory/
+├── .agents/               # memory/, hooks/, graph/, skills/ (tous agents) ; .claude/ et .codex/ : hooks
 ├── src/ (ou app/)         # TOUT le code source
 ├── tests/                 # ou __tests__ / colocalisés
 ├── docs/                  # doc technique, architecture, ADRs
@@ -38,13 +38,14 @@ src/
 
 ```
 <projet>/
-├── README.md · CLAUDE.md · .gitignore
-├── .claude/
-│   ├── memory/           # protocole mémoire (créé par scaffold_claude.py)
-│   ├── hooks/graph_hook.py
+├── README.md · AGENTS.md · CLAUDE.md · .gitignore
+├── .agents/                   # mémoire partagée par tous les agents (créée par scaffold_memory.py)
+│   ├── memory/                # protocole, état, journal, décisions, problèmes
+│   ├── hooks/memory_hook.py
 │   ├── graph/graph.json
-│   ├── skills/<ds>/SKILL.md   # la skill de l'outil de design, si fournie
-│   └── settings.json
+│   └── skills/<ds>/SKILL.md   # la skill de l'outil de design, si fournie
+├── .claude/                   # Claude Code : settings.json (hooks), skills/<ds> (copie)
+├── .codex/hooks.json          # Codex : hooks
 ├── src/
 │   ├── styles/
 │   │   ├── index.css          # point d'entrée (@import des tokens + composants)
