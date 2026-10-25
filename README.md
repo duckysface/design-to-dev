@@ -26,7 +26,8 @@ Skill pour **Claude Code** et **Codex** · mémoire lue aussi par Cursor, Gemini
 5. [La mémoire partagée](#la-mémoire-partagée)
 6. [Sécurité](#sécurité)
 7. [Garde-fous](#garde-fous)
-8. [Référence des commandes](#référence-des-commandes)
+8. [Confidentialité et licence](#confidentialité-et-licence)
+9. [Référence des commandes](#référence-des-commandes)
 
 ---
 
@@ -280,6 +281,14 @@ Méthode inspirée de [cloudflare/security-audit-skill](https://github.com/cloud
 
 ---
 
+## Confidentialité et licence
+
+- **Aucune télémétrie, aucun compte** : tout reste sur ta machine. Détails : [PRIVACY.md](PRIVACY.md).
+- **Une faille ?** Signale-la en privé : [SECURITY.md](SECURITY.md).
+- **Licence MIT** : ton design et les fichiers générés t'appartiennent. Droits d'auteur, projets tiers et marques : [NOTICE.md](NOTICE.md).
+
+---
+
 ## Référence des commandes
 
 <details>
@@ -375,6 +384,8 @@ Format du plan : [`references/plan-format.md`](references/plan-format.md). Tests
 
 <div align="center">
 
-Licence [MIT](LICENSE) · Fait pour Claude Code, Codex et tous les agents qui lisent `AGENTS.md`
+[Licence MIT](LICENSE) · [Confidentialité](PRIVACY.md) · [Sécurité](SECURITY.md) · [Mentions](NOTICE.md)
+
+Projet indépendant, sans lien avec Anthropic, OpenAI ni les outils cités
 
 </div>
