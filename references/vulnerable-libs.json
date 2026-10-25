@@ -1,0 +1,19 @@
+{
+  "updated": "2026-10-25",
+  "note": "Versions minimales sûres des bibliothèques souvent copiées depuis un CDN dans les maquettes. Hors ligne : à rafraîchir à chaque version de design-to-dev. Une version absente de cette liste n'est pas « sûre » : vérifier avec npm audit / osv-scanner.",
+  "libs": [
+    {"name": "jquery", "aliases": ["jquery.min", "jquery.slim"], "min_safe": "3.5.0", "cve": ["CVE-2020-11022", "CVE-2020-11023"], "why": "XSS via htmlPrefilter (.html(), .append())", "replace": "jquery@latest via le gestionnaire de paquets, ou retirer jQuery au portage"},
+    {"name": "bootstrap", "aliases": ["twitter-bootstrap"], "min_safe": "4.3.1", "eol_below": "4.0.0", "cve": ["CVE-2019-8331", "CVE-2018-14042"], "why": "XSS dans tooltip/popover (data-template) ; 3.x en fin de vie", "replace": "bootstrap@5 via le gestionnaire de paquets"},
+    {"name": "lodash", "aliases": ["lodash.min"], "min_safe": "4.17.21", "cve": ["CVE-2021-23337", "CVE-2020-8203"], "why": "injection de commande (template), pollution de prototype", "replace": "lodash@latest ou fonctions natives"},
+    {"name": "angularjs", "aliases": ["angular.js", "angular.min", "angular"], "min_safe": null, "eol": true, "match_major": "1", "cve": ["CVE-2022-25869", "CVE-2023-26116"], "why": "AngularJS 1.x en fin de vie depuis 2022 (XSS, ReDoS non corrigés)", "replace": "porter vers la stack retenue (pas de reprise d'AngularJS)"},
+    {"name": "moment", "aliases": ["moment.min", "moment.js"], "min_safe": "2.29.4", "deprecated": true, "cve": ["CVE-2022-31129", "CVE-2022-24785"], "why": "ReDoS et traversée de chemin ; projet en maintenance seule", "replace": "date-fns, Day.js ou Temporal"},
+    {"name": "handlebars", "aliases": ["handlebars.min"], "min_safe": "4.7.7", "cve": ["CVE-2021-23369", "CVE-2021-23383"], "why": "exécution de code via templates", "replace": "handlebars@latest ou le moteur de la stack"},
+    {"name": "jquery-ui", "aliases": ["jqueryui", "jquery-ui.min"], "min_safe": "1.13.2", "cve": ["CVE-2022-31160", "CVE-2021-41184"], "why": "XSS (checkboxradio, position)", "replace": "composants natifs ou de la stack"},
+    {"name": "underscore", "aliases": ["underscore.js", "underscore-min"], "min_safe": "1.12.1", "cve": ["CVE-2021-23358"], "why": "injection via _.template", "replace": "underscore@latest ou fonctions natives"},
+    {"name": "chart.js", "aliases": ["chartjs", "chart", "chart.min"], "min_safe": "2.9.4", "cve": ["CVE-2020-7746"], "why": "pollution de prototype (options)", "replace": "chart.js@4 via le gestionnaire de paquets"},
+    {"name": "axios", "aliases": ["axios.min"], "min_safe": "1.6.0", "cve": ["CVE-2023-45857", "CVE-2024-39338"], "why": "fuite du jeton XSRF, SSRF", "replace": "axios@latest ou fetch natif"},
+    {"name": "dompurify", "aliases": ["purify", "purify.min"], "min_safe": "3.1.3", "cve": ["CVE-2024-45801", "CVE-2024-47875"], "why": "contournement de l'assainissement", "replace": "dompurify@latest"},
+    {"name": "highlight.js", "aliases": ["highlightjs", "highlight.min"], "min_safe": "10.4.1", "cve": ["CVE-2020-26237"], "why": "ReDoS / pollution de prototype", "replace": "highlight.js@latest ou shiki"},
+    {"name": "marked", "aliases": ["marked.min"], "min_safe": "4.0.10", "cve": ["CVE-2022-21680", "CVE-2022-21681"], "why": "ReDoS", "replace": "marked@latest + DOMPurify"}
+  ]
+}

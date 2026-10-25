@@ -51,6 +51,7 @@ Usage :
 Outils (lecture seule, sans agent) :
   npx design-to-dev scan <dossier> [--out f.json]       intention, écrans/démos existants, contrat backend
   npx design-to-dev inventory <dossier> [--out f.json]  inventaire des fichiers (refs, doublons, signaux)
+  npx design-to-dev foundations <dossier> [--strict]   fondations ✅/⚠️/❌ → docs/security/fondations.md
   npx design-to-dev security <dossier> [--out f.json]   base de sécurité statique (candidats, CWE/ASVS)
   npx design-to-dev requirements --intent dashboard     exigences de sécurité par stack
   npx design-to-dev skills                              superpowers et security-audit installées ?
@@ -237,6 +238,7 @@ const PY_TOOLS = {
   scan: ["detect_project.py", "scan"],
   skills: ["detect_project.py", "skills"],
   inventory: ["organize.py", "inventory"],
+  foundations: ["security_check.py", "foundations"],
   security: ["security_check.py", "scan"],
   requirements: ["security_check.py", "requirements"],
 };

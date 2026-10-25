@@ -1,6 +1,6 @@
 {
   "name": "design-to-dev",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Skill de pré-production pour Claude Code et Codex : transforme n'importe quel export design (Claude Design, Figma, v0, Lovable…) en projet prêt à coder, avec structure propre et mémoire multi-agents déjà configurée — agent-ready dès le premier jour.",
   "bin": {
     "design-to-dev": "bin/cli.js"
@@ -17,7 +17,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node bin/cli.js --version && python tests/test_memory.py && python tests/test_project.py"
+    "test": "node bin/cli.js --version && python tests/test_memory.py && python tests/test_project.py && python tests/test_pipeline.py"
   },
   "engines": {
     "node": ">=18"

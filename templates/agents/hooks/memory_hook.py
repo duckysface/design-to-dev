@@ -391,11 +391,16 @@ def doctor():
     lines = read("MEMORY.md").count("\n")
     if lines > 150:
         problems.append(f"MEMORY.md fait {lines} lignes (max 150) : déplacer le détail dans des fichiers dédiés")
+    if "## Origine du projet" not in read("MEMORY.md"):
+        problems.append("MEMORY.md n'a pas de bloc « ## Origine du projet » (acte de naissance) : "
+                        "relancer `scaffold_memory.py <projet> --update` pour l'ajouter")
     jl = read("journal.md").count("\n")
     if jl > JOURNAL_MAX:
         problems.append(f"journal.md fait {jl} lignes : lancer `{CLI} archive`")
-    if "[À compléter" in read("etat.md") or "[à compléter" in read("etat.md"):
-        problems.append("etat.md contient encore des « à compléter » : objectif et prochaine étape à remplir")
+    todo = [s.split("\n", 1)[0].strip() for s in re.split(r"(?m)^## ", read("etat.md"))[1:]
+            if "[à compléter" in s.lower()]
+    if todo:
+        problems.append(f"etat.md contient encore des « à compléter » (sections : {', '.join(todo)})")
     g = load()
     gone = [nid for nid, n in g["nodes"].items() if n.get("path") and not (ROOT / n["path"]).exists()]
     if gone:

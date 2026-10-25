@@ -7,6 +7,7 @@ sévérité n'est attribuée ici : seule une vérification humaine ou un audit c
 (skill security-audit) confirme une vulnérabilité.
 
   security_check.py scan <dossier> [--json] [--out findings.json]
+  security_check.py foundations <cible> [--out docs/security/fondations.md] [--strict] [--run-audits] [--json]
   security_check.py requirements --intent dashboard[,backend] [--inventory design-inventory.json] [--out exigences.md]
 """
 import argparse
@@ -53,7 +54,8 @@ RULES = [
      r"(?i)(md5|sha1|sha256)\s*\(.{0,40}pass|pass\w*.{0,40}(md5|sha1)\b", None, "CWE-916", "V2.4.1",
      "Argon2id (crate argon2 / bibliothèque équivalente) avec sel aléatoire."),
     ("weak-random", "Math.random pour un secret",
-     r"(?i)Math\.random\(\).{0,60}(token|secret|password|otp|code|id)|(token|secret|otp)\w*\s*=.{0,30}Math\.random",
+     r"Math\.random\(\).{0,60}\b(?:(?i:token|secret|password|passwd|otp|nonce|salt|session)\w*|(?i:id|uuid|code)"
+     r"|\w+(?:Id|ID|_id|Token|Secret))\b|(?i:\w*(?:token|secret|otp|nonce))\s*=.{0,30}Math\.random",
      None, "CWE-338", "V6.3.1", "crypto.getRandomValues / crypto.randomUUID / rand::rngs::OsRng."),
     ("cors-wildcard", "CORS ouvert à toutes les origines",
      r"""(?i)Access-Control-Allow-Origin["']?\s*[:,]\s*["']\*|CorsLayer::(permissive|very_permissive)|allow_origin\(\s*Any|origin:\s*["']\*["']|cors\(\s*\)""",
@@ -135,10 +137,9 @@ def scan_file(rel, text, ext):
     return out
 
 
-def scan(root, as_json, out_path):
+def collect(root):
+    """Liste des constats (candidate / needs_validation) sans rien afficher."""
     root = Path(root).resolve()
-    if not root.is_dir():
-        sys.exit(f"Dossier introuvable : {root}")
     findings, names, has_csp, has_html = [], set(), False, False
     for p in walk(root):
         rel = p.relative_to(root).as_posix()
@@ -168,6 +169,14 @@ def scan(root, as_json, out_path):
     findings.append(finding("deploy-headers", "HTTPS, HSTS et en-têtes de sécurité non vérifiables depuis le code", ".", 0,
                             "CWE-693", "V14.4", "Contrôler sur l'environnement déployé (curl -I) : HSTS, CSP, "
                             "X-Content-Type-Options, frame-ancestors, Referrer-Policy.", status="needs_validation"))
+    return findings
+
+
+def scan(root, as_json, out_path):
+    root = Path(root).resolve()
+    if not root.is_dir():
+        sys.exit(f"Dossier introuvable : {root}")
+    findings = collect(root)
     report = {"root": str(root), "findings": findings,
               "note": "candidate = motif à vérifier ; needs_validation = dépend du déploiement. Aucune sévérité ici."}
     if out_path:
@@ -291,6 +300,23 @@ def requirements(intents, inventory, out_path):
     return 0
 
 
+def load_foundations():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("d2d_foundations", Path(__file__).with_name("foundations.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def skill_version():
+    skill = Path(__file__).resolve().parent.parent
+    for f in (skill / ".version", skill / "package.json"):
+        if f.is_file():
+            text = f.read_text(encoding="utf-8")
+            return "v" + (json.loads(text).get("version", "?") if f.suffix == ".json" else text.strip())
+    return "v?"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -298,6 +324,12 @@ def main():
     a.add_argument("folder")
     a.add_argument("--json", action="store_true")
     a.add_argument("--out")
+    f = sub.add_parser("foundations", help="contrôle des fondations → docs/security/fondations.md")
+    f.add_argument("folder")
+    f.add_argument("--out")
+    f.add_argument("--strict", action="store_true", help="code 1 s'il reste un ❌")
+    f.add_argument("--run-audits", action="store_true", help="lancer npm/cargo audit, osv-scanner (accord utilisateur)")
+    f.add_argument("--json", action="store_true")
     b = sub.add_parser("requirements")
     b.add_argument("--intent", required=True)
     b.add_argument("--inventory")
@@ -305,6 +337,9 @@ def main():
     args = ap.parse_args()
     if args.cmd == "scan":
         return scan(args.folder, args.json, args.out)
+    if args.cmd == "foundations":
+        return load_foundations().run(args.folder, args.out, args.strict, args.run_audits, args.json, collect,
+                                      skill_version())
     return requirements(args.intent, args.inventory, args.out)
 
 

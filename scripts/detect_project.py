@@ -4,6 +4,7 @@
 Lecture seule : aucun fichier du dossier analysé n'est exécuté ni modifié.
 
   detect_project.py scan <dossier> [--out design-inventory.json]   (+ mode fresh/existing, prochaine étape)
+  Profil de stack : ~/.design-to-dev/stack.json (ou variable DESIGN_TO_DEV_STACK), fusionné sur les choix par défaut.
   detect_project.py skills [--require superpowers,security-audit] [--json]
 """
 import argparse
@@ -63,7 +64,7 @@ SIGNALS = {
     "ios": [(r"\.xcodeproj|\bswiftui\b|import swiftui", 6), (r"\b(iphone|ipad|ios)\b", 3), (r"dynamic[- ]island", 3),
             (r"safe-area-inset|status-?bar|home-indicator", 2), (r"\b(390|393|430)\s*[x×]\s*(844|852|932)\b", 3),
             (r"\bcupertino\b|sf pro", 2), (r"\btab-?bar\b", 1)],
-    "android": [(r"androidmanifest|build\.gradle|jetpack|compose", 6), (r"\bandroid\b", 3), (r"material ?(3|you)", 2),
+    "android": [(r"androidmanifest|build\.gradle|\bjetpack compose\b|androidx\.compose", 6), (r"\bandroid\b", 3), (r"material ?(3|you)", 2),
                 (r"\b(360|412)\s*[x×]\s*(800|915|892)\b", 3), (r"\bfab\b|floating action|bottom-?nav", 1)],
     "backend": [(r"cargo\.toml|\baxum\b|actix", 4), (r"openapi|swagger", 4), (r"migrations?/|\.sql\b", 2),
                 (r"\b(api|endpoint|webhook)s?\b", 1)],
@@ -91,7 +92,10 @@ INPUT_RE = re.compile(r"<(?:input|Input|TextField|textarea|select)\b([^>]*)>", r
 ATTR_RE = {a: re.compile(a + r"""\s*=\s*["'{]([^"'}]+)""", re.I) for a in ("type", "name", "id", "placeholder")}
 TH_RE = re.compile(r"<th\b[^>]*>(.*?)</th>", re.I | re.S)
 FETCH_RE = re.compile(r"""\b(?:fetch|axios\.(?:get|post|put|patch|delete)|\$fetch|useQuery|createQuery)\s*\(\s*[`"']?([^`"',)\s]*)""")
-MOCK_RE = re.compile(r"""\b(?:const|let|var)\s+(\w*(?:mock|fake|sample|data|rows|items|users|orders|products|clients)\w*)\s*(?::[^=]+)?=\s*\[""", re.I)
+# nom explicitement factice, ou nom d'entité seulement s'il est suivi d'un tableau d'objets (`users = [{`)
+MOCK_RE = re.compile(r"""\b(?:const|let|var)\s+(\w*(?:mock|fake|sample|dummy|demo|seed|fixture|placeholder)\w*|"""
+                     r"""\w*(?:users|orders|products|clients|customers|rows|transactions|invoices)\w*"""
+                     r"""(?=\s*(?::[^=]+)?=\s*\[\s*\{))\s*(?::[^=]+)?=\s*\[""", re.I)
 FEATURES = {
     "auth": re.compile(r"type\s*=\s*[\"']password|mot de passe|password|sign ?in|log ?in|connexion", re.I),
     "signup": re.compile(r"sign ?up|register|inscription|cr[ée]er un compte", re.I),
@@ -193,13 +197,62 @@ def detect_frameworks(root):
         if n == "cargo.toml":
             t = read_text(p).lower()
             found |= {x for x in ("axum", "actix-web", "tauri", "sqlx", "rusqlite", "uniffi") if x in t}
-        elif n.endswith((".xcodeproj", ".swift")):
+        elif n.endswith(".swift") or any(part.lower().endswith(".xcodeproj") for part in p.relative_to(root).parts):
             found.add("swift")
         elif n in ("build.gradle", "build.gradle.kts", "androidmanifest.xml"):
             found.add("android")
         elif n == "pubspec.yaml":
             found.add("flutter")
     return sorted(found)
+
+
+# (dépendance, nom) d'un backend déjà en place, à garder plutôt que remplacer
+BACKEND_DEPS = (("@supabase/supabase-js", "Supabase"), ("@supabase/ssr", "Supabase"), ("firebase", "Firebase"),
+                ("firebase-admin", "Firebase"), ("@prisma/client", "Prisma"), ("drizzle-orm", "Drizzle"),
+                ("express", "Express"), ("@nestjs/core", "NestJS"), ("fastify", "Fastify"), ("hono", "Hono"),
+                ("convex", "Convex"), ("@trpc/server", "tRPC"), ("pocketbase", "PocketBase"), ("appwrite", "Appwrite"))
+TEXT_BACKENDS = {"pyproject.toml": (("fastapi", "FastAPI"), ("django", "Django"), ("flask", "Flask")),
+                 "requirements.txt": (("fastapi", "FastAPI"), ("django", "Django"), ("flask", "Flask")),
+                 "gemfile": (("rails", "Rails"),), "composer.json": (("laravel/framework", "Laravel"),),
+                 "cargo.toml": (("axum", "Rust Axum"), ("actix-web", "Rust Actix"))}
+
+
+def detect_backend(root):
+    found = set()
+    for p in walk(root):
+        n = p.name.lower()
+        if n == "package.json":
+            try:
+                data = json.loads(read_text(p))
+            except ValueError:
+                continue
+            deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
+            found |= {name for dep, name in BACKEND_DEPS if dep in deps}
+        elif n in TEXT_BACKENDS:
+            text = read_text(p).lower()
+            found |= {name for key, name in TEXT_BACKENDS[n]
+                      if re.search(r"(?<![\w-])" + re.escape(key) + r"(?![\w-])", text)}
+    return sorted(found)
+
+
+def load_stack_profile():
+    """Profil utilisateur {"stacks": {...}, "first_step": {...}} ; absent = choix par défaut."""
+    path = Path(os.environ.get("DESIGN_TO_DEV_STACK") or Path.home() / ".design-to-dev" / "stack.json")
+    empty = {"path": None, "stacks": {}, "first_step": {}}
+    if not path.is_file():
+        return empty
+    try:
+        data = json.loads(read_text(path))
+    except ValueError as e:
+        print(f"Profil de stack illisible ({path}) : {e} — choix par défaut utilisés", file=sys.stderr)
+        return empty
+    return {"path": str(path), "stacks": data.get("stacks") or {}, "first_step": data.get("first_step") or {}}
+
+
+class _Keep(dict):
+    """format_map qui laisse intacts les {champs} inconnus d'un profil utilisateur."""
+    def __missing__(self, key):
+        return "{" + key + "}"
 
 
 # --------------------------------------------------------------------------- projet déjà avancé
@@ -212,6 +265,27 @@ CODE_DIRS = ("src", "app", "apps", "packages", "web", "api", "server", "lib", "s
 CODE_EXT = UI_EXT | {".js", ".mjs", ".ts", ".rs", ".py", ".go", ".java", ".rb", ".php"}
 LOCKFILES = (("pnpm-lock.yaml", "pnpm"), ("yarn.lock", "yarn"), ("bun.lockb", "bun"), ("bun.lock", "bun"),
              ("package-lock.json", "npm"))
+
+
+# livrables design-to-dev : un projet à moitié fait ne regénère que ceux qui manquent (mode « compléter »)
+DELIVERABLES = {
+    "memory": ("mémoire `.agents/memory/etat.md`", [".agents/memory/etat.md"]),
+    "agents": ("`AGENTS.md`", ["AGENTS.md"]),
+    "screens": ("écrans `docs/design/screens.md`", ["docs/design/screens.md"]),
+    "stack": ("stack `docs/architecture/stack.md`", ["docs/architecture/stack.md"]),
+    "foundations": ("fondations `docs/security/fondations.md`", ["docs/security/fondations.md"]),
+    "requirements": ("exigences `docs/security/exigences.md`", ["docs/security/exigences.md"]),
+    "plan": ("plan `docs/superpowers/plans/`", ["docs/superpowers/plans", "docs/plans"]),
+    "file_map": ("carte `docs/cleanup/file-map.json`", ["docs/cleanup/file-map.json"]),
+}
+
+
+def deliverables(root):
+    found = {}
+    for key, (_, rels) in DELIVERABLES.items():
+        found[key] = next((r for r in rels if (root / r).is_file()
+                           or ((root / r).is_dir() and any((root / r).iterdir()))), None)
+    return found
 
 
 def has_code(folder):
@@ -267,6 +341,7 @@ def project_state(root):
     if lockfile:
         signals.append("lockfile")
     existing = (bool(manifests or xcode) and bool(code_dirs or lockfile or memory)) or len(code_dirs) >= 2
+    done = deliverables(root)
     return {
         "mode": "existing" if existing else "fresh",
         "signals": signals,
@@ -275,6 +350,8 @@ def project_state(root):
         "git": (root / ".git").exists(),
         "agents_memory": memory,
         "commands": commands(root, manifests),
+        "deliverables": done,
+        "missing": [k for k, v in done.items() if not v],
     }
 
 
@@ -301,7 +378,11 @@ def endpoint_for(screen, contract):
     return contract["endpoints"][0] if contract["endpoints"] else None
 
 
-def next_step(state, intent, frameworks, screens, contract):
+KEEP_BACKEND_STEP = ("Garder {backend} déjà en place (pas de nouveau backend) : brancher les tokens dans le frontend "
+                     "({front}), puis porter {screen} en le reliant à {backend} pour {endpoint}")
+
+
+def next_step(state, intent, frameworks, screens, contract, backend=(), first_steps=FIRST_STEP):
     """Action précise par laquelle commencer, écrite dans .agents/memory/etat.md."""
     views = [s for s in screens if s["kind"] in ("page", "demo")]
     auth = next((s for s in views if "auth" in s["features"]), None)
@@ -323,8 +404,11 @@ def next_step(state, intent, frameworks, screens, contract):
     route = "`web/src/routes/(auth)/login`" if auth else "première route de `web/src/routes/`"
     endpoint = (endpoint_for(first, contract) if first else None) or \
         (contract["endpoints"][0] if contract["endpoints"] else "GET /api/health")
-    step = FIRST_STEP[intent["primary"]].format(screen=screen, route=route, endpoint=f"`{endpoint}`")
     kept = [f for f in frameworks if f in ("react", "next", "svelte", "sveltekit", "vue", "nuxt", "astro")]
+    if backend and intent["primary"] in ("dashboard", "backend"):
+        return KEEP_BACKEND_STEP.format(backend=", ".join(backend), front=", ".join(kept) or "celui du design",
+                                        screen=screen, endpoint=f"`{endpoint}`")
+    step = first_steps[intent["primary"]].format_map(_Keep(screen=screen, route=route, endpoint=f"`{endpoint}`"))
     if kept:
         step += f" (ou garder {', '.join(kept)} déjà utilisé par le design — à confirmer)"
     return step
@@ -406,6 +490,9 @@ def analyse(root):
     best, secondary, ambiguous = decide(scores, screens)
     intents = [best] + secondary if best else []
     frameworks = detect_frameworks(root)
+    backend = detect_backend(root)
+    profile = load_stack_profile()
+    stacks = {**STACKS, **profile["stacks"]}
     state = project_state(root)
     contract = backend_contract([s for s in screens if s["kind"] != "component"] or screens)
     result = {
@@ -422,11 +509,15 @@ def analyse(root):
                          ["Que veux-tu construire : site vitrine, dashboard web, app desktop, iOS, Android ?"] +
                          [QUESTIONS[i] for i in intents[:2]],
         },
-        "recommended_stack": {i: STACKS[i] for i in intents},
+        "stack_profile": profile["path"],
+        "existing_backend": backend,
+        "recommended_stack": {i: (f"Garder {', '.join(backend)} (déjà en place) — alternative : {stacks[i]}"
+                                  if backend and i in ("dashboard", "backend") else stacks[i]) for i in intents},
         "screens": screens,
         "backend_contract": contract,
     }
-    result["next_step"] = next_step(state, result["intent"], frameworks, screens, contract)
+    result["next_step"] = next_step(state, result["intent"], frameworks, screens, contract, backend,
+                                    {**FIRST_STEP, **profile["first_step"]})
     return result
 
 
@@ -454,6 +545,15 @@ def print_summary(r, out):
         print("  + " + ", ".join(INTENTS[i] for i in it["secondary"]))
     print("Scores : " + (", ".join(f"{k}={v}" for k, v in it["scores"].items()) or "aucun signal"))
     print("Frameworks déjà présents : " + (", ".join(r["frameworks"]) or "aucun"))
+    if r["existing_backend"]:
+        print(f"Backend déjà en place : {', '.join(r['existing_backend'])} → à garder (pas de nouveau backend)")
+    print("Profil de stack : " + (r["stack_profile"] or "défaut (~/.design-to-dev/stack.json absent)"))
+    for i, s in r["recommended_stack"].items():
+        print(f"  stack {i} : {s}")
+    have = [DELIVERABLES[k][0] for k, v in st["deliverables"].items() if v]
+    if have:
+        print("Déjà en place : " + ", ".join(have))
+        print("Manque (mode compléter) : " + (", ".join(DELIVERABLES[k][0] for k in st["missing"]) or "rien"))
     kinds = Counter(s["kind"] for s in r["screens"])
     status = Counter(s["status"] for s in r["screens"] if s["kind"] != "component")
     print(f"Écrans existants : {kinds.get('page', 0)} pages, {kinds.get('demo', 0)} démos, "

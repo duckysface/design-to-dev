@@ -202,28 +202,48 @@ npx design-to-dev init . --update                          # met à jour le hook
 
 ## 🔄 Comment ça marche
 
+Deux modes : **rapide** (défaut) ou **complet** (+ plan superpowers et audit Cloudflare). La mémoire se remplit dès l'étape 0, pas à la fin.
+
 ```mermaid
 flowchart TD
-    S0["<b>0 · Cadrage</b><br/>source, cible, intention, mémoire, agents"]
-    S1["<b>1 · Inventaire + détection</b><br/>fichiers, doublons, écrans,<br/>intention, contrat backend"]
+    S0["<b>0 · Cadrage</b><br/>source, cible, mode, stack, agents"]
+    S1["<b>1 · Inventaire + détection</b><br/>fichiers, écrans, intention,<br/>projet neuf ou déjà commencé"]
     S2["<b>2 · Analyse</b><br/>équipes nettoyage + design<br/>(questions si intention floue)"]
-    S3["<b>3 · Plan</b><br/>keep / move / delete<br/>+ vérification automatique"]
+    S3["<b>3 · Plan de nettoyage</b><br/>keep / move / delete<br/>+ vérification automatique"]
     OK{"<b>Validation</b><br/>par toi"}
-    S4["<b>4 · Application</b><br/>copie + réécriture des chemins"]
+    S4["<b>4 · Application</b><br/>copie, chemins réécrits,<br/>mémoire .agents/ installée"]
     S5["<b>5 · Fichiers racine</b><br/>README, ADR, screens.md, stack.md"]
-    S6["<b>6 · Mémoire</b><br/>.agents/ : mémoire, graphe, hooks<br/>+ adaptateurs par agent"]
-    S7["<b>7 · Plan</b><br/>superpowers : brancher l'existant"]
-    S8["<b>8 · Sécurité</b><br/>base CWE/ASVS + exigences<br/>+ audit Cloudflare"]
-    S9["<b>9 · Git</b><br/>premier commit (sur demande)"]
+    S6["<b>6 · Fondations + sécurité</b><br/>✅ / ⚠️ / ❌, CWE/ASVS, exigences"]
+    MODE{"<b>Mode</b>"}
+    S7["<b>7 · Plan superpowers</b><br/>❌ = phase 0, brancher l'existant"]
+    S8["<b>8 · Audit Cloudflare</b><br/>mode guidance"]
+    S9["<b>9 · Clôture</b><br/>prochaine étape exacte,<br/>--check, git (sur demande)"]
+    PRE[("📝 memoire-preprod<br/>(scratchpad)")]
+    MEM[("🧠 .agents/memory<br/>journal · etat · decisions")]
 
     S0 --> S1 --> S2 --> S3 --> OK
     OK -- "à corriger" --> S3
-    OK -- "oui" --> S4 --> S5 --> S6 --> S7 --> S8 --> S9
+    OK -- "oui" --> S4 --> S5 --> S6 --> MODE
+    MODE -- "complet" --> S7 --> S8 --> S9
+    MODE -- "rapide" --> S9
+    S0 & S1 & S2 & S3 -. "preprod_log.py" .-> PRE
+    PRE == "--import-preprod" ==> MEM
+    S5 & S6 & S7 & S8 & S9 -. "preprod_log.py" .-> MEM
 
     style OK fill:#fff4cc,stroke:#f0b400,color:#000
+    style MODE fill:#fff4cc,stroke:#f0b400,color:#000
     style S4 fill:#e3f0ff,stroke:#4a90d9,color:#000
-    style S6 fill:#efe3ff,stroke:#8e5cd9,color:#000
+    style S6 fill:#ffe3e3,stroke:#d94a4a,color:#000
+    style MEM fill:#efe3ff,stroke:#8e5cd9,color:#000
 ```
+
+| | Rapide (défaut) | Complet |
+|---|---|---|
+| Étapes 0 à 6 (nettoyage, mémoire, fondations, exigences) | ✅ | ✅ |
+| Étape 7 · plan superpowers (repli : `docs/plans/` écrit à la main) | — | ✅ |
+| Étape 8 · audit Cloudflare (repli : relecture manuelle) | — | ✅ |
+
+Projet **déjà commencé** (manifeste + code) ? Mode « nettoyer + compléter » : la stack en place est gardée, seuls les déchets évidents sont retirés et seuls les livrables manquants sont produits.
 
 ### 🤖 L'analyse par sous-agents
 
@@ -271,14 +291,18 @@ Avant toute copie, le plan est vérifié automatiquement. Il est **refusé** si 
 
 Si tes maquettes utilisent déjà un framework, la skill te demande : le garder ou le porter. Détails : [`references/stacks.md`](references/stacks.md).
 
-### 🔒 Sécurité, avant d'écrire le backend
+### 🔒 Fondations et sécurité, avant tout plan
 
 Méthode reprise de [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (un motif repéré n'est qu'un *candidat*, pas une faille) et contrôles ancrés dans OWASP ASVS 4.0.3 et les CWE, comme [UnitOneAI/SecuritySkills](https://github.com/UnitOneAI/SecuritySkills) :
 
-1. `security` repère les motifs à risque (XSS, SQL concaténé, jetons dans `localStorage`, secrets en dur, Tauri/Electron/Android/iOS mal configurés…) → `docs/security/baseline.json`.
-2. `requirements` écrit la checklist de la stack et des écrans détectés (connexion → anti brute-force, upload → contrôle MIME…) → `docs/security/exigences.md`.
-3. Chaque exigence devient une tâche testée dans le plan superpowers.
-4. Avant la prod : skill `security-audit` de Cloudflare (installée seulement si tu le veux).
+1. `foundations` vérifie que la base est saine → `docs/security/fondations.md` : bibliothèques CDN anciennes et vulnérables, dépendances et scripts d'installation, code caché ou obfusqué, fichiers étrangers (`.php`, `.exe`…), caractères Unicode invisibles (Trojan Source), consignes cachées pour IA, secrets. Chaque point est ✅ / ⚠️ / ❌ ; `--strict` échoue s'il reste un ❌, et aucune tâche backend ne commence tant qu'un ❌ est ouvert.
+2. `security` repère les motifs à risque (XSS, SQL concaténé, jetons dans `localStorage`, secrets en dur, Tauri/Electron/Android/iOS mal configurés…) → `docs/security/baseline.json`.
+3. `requirements` écrit la checklist de la stack et des écrans détectés (connexion → anti brute-force, upload → contrôle MIME…) → `docs/security/exigences.md`.
+4. Mode complet : chaque exigence devient une tâche testée dans le plan superpowers, puis guidance de la skill `security-audit` de Cloudflare (installée seulement si tu le veux).
+
+```bash
+npx design-to-dev foundations ./mon-projet --strict
+```
 
 ## 📂 Résultat type
 
@@ -370,6 +394,20 @@ sequenceDiagram
 | `problemes.md` | Pièges rencontrés et solutions |
 | `graph.json` | Qui importe qui, quelles sessions ont touché quoi, notes durables |
 
+`MEMORY.md` commence par l'**acte de naissance** (`## Origine du projet`) : date et dossier source, fondations vérifiées, plan de nettoyage validé. `doctor` signale s'il manque ; `scaffold_memory.py <projet> --update` le remet.
+
+### ✍️ Remplie en direct, dès l'étape 0
+
+Pendant la préproduction, avant même que la cible existe, chaque étape écrit sa trace avec `preprod_log.py` : « EN COURS » avant, résultat après. Chaque entrée est horodatée et signée par l'agent ; un secret ou une consigne pour agent est refusé et rien n'est écrit.
+
+```bash
+python scripts/preprod_log.py etat     --dir "$M" --step 3 --status "EN ATTENTE DE VALIDATION"
+python scripts/preprod_log.py journal  --dir "$M" --step 3 --agent claude-code "arbre cible : 42 keep, 17 move, 9 delete"
+python scripts/preprod_log.py decision --dir "$M" --title "Stack" --why "dashboard admin" --by utilisateur "SvelteKit + Axum"
+python scripts/scaffold_memory.py "<cible>" --import-preprod "$M"   # étape 4 : rejoue tout, trié par date
+python scripts/scaffold_memory.py "<cible>" --check                 # doctor + une entrée de journal par étape 0 à 9
+```
+
 ### 🔎 Commandes de la mémoire
 
 ```bash
@@ -431,12 +469,15 @@ python scripts/organize.py verify "<cible>"
 # 5. Détection du projet et sécurité
 python scripts/detect_project.py scan "<source>" --out design-inventory.json
 python scripts/detect_project.py skills --require superpowers,security-audit
+python scripts/security_check.py foundations "<cible>" [--strict] [--run-audits]
 python scripts/security_check.py scan "<cible>" --out baseline.json
 python scripts/security_check.py requirements --intent dashboard --inventory design-inventory.json
 
 # 6. Préproduction multi-agents
 python scripts/scaffold_memory.py "<cible>" --name "Mon projet" \
-  --file-map "<cible>/docs/cleanup/file-map.json" --agents claude,codex [--private-memory]
+  --file-map "<cible>/docs/cleanup/file-map.json" --agents claude,codex \
+  --import-preprod "<scratchpad>/memoire-preprod" [--private-memory]
+python scripts/preprod_log.py --help
 ```
 
 Format du plan : [`references/plan-format.md`](references/plan-format.md). Tests : `npm test`.
@@ -451,10 +492,12 @@ Format du plan : [`references/plan-format.md`](references/plan-format.md). Tests
 | [`references/`](references/) | Conventions de dossiers, stacks par intention, réutilisation du design, sécurité, format du plan, prompts des sous-agents |
 | [`scripts/organize.py`](scripts/organize.py) | Inventaire, vérification du plan, application, vérification des liens |
 | [`scripts/detect_project.py`](scripts/detect_project.py) | Intention, écrans existants, contrat backend, skills compagnes |
-| [`scripts/security_check.py`](scripts/security_check.py) | Candidats de sécurité, exigences par stack |
-| [`scripts/scaffold_memory.py`](scripts/scaffold_memory.py) | Création de `.agents/` et des adaptateurs par agent, `--check`, `--update` |
+| [`scripts/security_check.py`](scripts/security_check.py) | Fondations ✅/⚠️/❌, candidats de sécurité, exigences par stack |
+| [`scripts/foundations.py`](scripts/foundations.py) · [`references/vulnerable-libs.json`](references/vulnerable-libs.json) | Contrôles des fondations, bibliothèques CDN à éviter |
+| [`scripts/preprod_log.py`](scripts/preprod_log.py) | Mémoire remplie en direct pendant la préproduction (journal, état, décisions, problèmes) |
+| [`scripts/scaffold_memory.py`](scripts/scaffold_memory.py) | Création de `.agents/` et des adaptateurs par agent, `--import-preprod`, `--check`, `--update` |
 | [`templates/agents/`](templates/agents/) | Protocole mémoire, règles du graphe, hook `memory_hook.py` |
-| [`bin/cli.js`](bin/cli.js) | CLI npx : `install`, `run`, `scan`, `security`, `requirements`, `skills`, `init`, `doctor`… |
+| [`bin/cli.js`](bin/cli.js) | CLI npx : `install`, `run`, `scan`, `foundations`, `security`, `requirements`, `skills`, `init`, `doctor`… |
 | [`install.sh`](install.sh) · [`install.ps1`](install.ps1) | Installation en une ligne, sans npm |
 | [`tests/`](tests/) | Tests de bout en bout |
 
