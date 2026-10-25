@@ -3,7 +3,7 @@
 
 Lecture seule : aucun fichier du dossier analysé n'est exécuté ni modifié.
 
-  detect_project.py scan <dossier> [--out design-inventory.json]
+  detect_project.py scan <dossier> [--out design-inventory.json]   (+ mode fresh/existing, prochaine étape)
   detect_project.py skills [--require superpowers,security-audit] [--json]
 """
 import argparse
@@ -161,7 +161,7 @@ def analyse_screen(rel, text):
     return {
         "path": rel,
         "kind": screen_kind(rel, text),
-        "title": clean(title.group(1)) if title else Path(rel).stem,
+        "title": clean(title.group(1)) if title else (PAGE_NAME_RE.sub("", Path(rel).stem) or Path(rel).stem),
         "features": sorted(k for k, r in FEATURES.items() if r.search(text)),
         "forms": len(FORM_RE.findall(text)),
         "fields": fields[:30],
@@ -200,6 +200,134 @@ def detect_frameworks(root):
         elif n == "pubspec.yaml":
             found.add("flutter")
     return sorted(found)
+
+
+# --------------------------------------------------------------------------- projet déjà avancé
+
+MANIFESTS = {"package.json": "node", "Cargo.toml": "rust", "pyproject.toml": "python", "requirements.txt": "python",
+             "go.mod": "go", "pubspec.yaml": "flutter", "build.gradle": "android", "build.gradle.kts": "android",
+             "Package.swift": "swift", "composer.json": "php", "Gemfile": "ruby"}
+CODE_DIRS = ("src", "app", "apps", "packages", "web", "api", "server", "lib", "src-tauri", "ios", "android", "core",
+             "bin", "cmd", "pkg", "scripts", "tests")
+CODE_EXT = UI_EXT | {".js", ".mjs", ".ts", ".rs", ".py", ".go", ".java", ".rb", ".php"}
+LOCKFILES = (("pnpm-lock.yaml", "pnpm"), ("yarn.lock", "yarn"), ("bun.lockb", "bun"), ("bun.lock", "bun"),
+             ("package-lock.json", "npm"))
+
+
+def has_code(folder):
+    return any(p.suffix.lower() in CODE_EXT for _, p in zip(range(2000), walk(folder)))
+
+
+def commands(root, manifests):
+    """Commandes install / lancer / tester, lues dans les manifestes (jamais exécutées)."""
+    cmds = {}
+    if "package.json" in manifests:
+        pm = next((m for f, m in LOCKFILES if (root / f).exists()), "npm")
+        try:
+            scripts = json.loads(read_text(root / "package.json")).get("scripts", {}) or {}
+        except ValueError:
+            scripts = {}
+        cmds["install"] = f"{pm} install"
+        run = next((s for s in ("dev", "start", "serve", "preview") if s in scripts), None)
+        if run:
+            cmds["run"] = f"{pm} run {run}"
+        if "test" in scripts:
+            cmds["test"] = f"{pm} test"
+        if "build" in scripts:
+            cmds["build"] = f"{pm} run build"
+    if "Cargo.toml" in manifests:
+        cmds.setdefault("install", "cargo build")
+        cmds.setdefault("run", "cargo run")
+        cmds.setdefault("test", "cargo test")
+    if "go.mod" in manifests:
+        cmds.setdefault("run", "go run .")
+        cmds.setdefault("test", "go test ./...")
+    if {"pyproject.toml", "requirements.txt"} & set(manifests):
+        cmds.setdefault("install", "pip install -e ." if "pyproject.toml" in manifests else "pip install -r requirements.txt")
+        cmds.setdefault("test", "pytest")
+    if "pubspec.yaml" in manifests:
+        cmds.setdefault("install", "flutter pub get")
+        cmds.setdefault("run", "flutter run")
+        cmds.setdefault("test", "flutter test")
+    return cmds
+
+
+def project_state(root):
+    """fresh = export de design à structurer ; existing = projet déjà commencé à compléter (pas à refaire)."""
+    manifests = [m for m in MANIFESTS if (root / m).is_file()]
+    xcode = sorted(p.name for p in root.glob("*.xcodeproj"))
+    code_dirs = [d for d in CODE_DIRS if (root / d).is_dir() and has_code(root / d)]
+    signals = manifests + xcode + [f"{d}/" for d in code_dirs]
+    if (root / ".git").exists():
+        signals.append(".git")
+    memory = (root / ".agents" / "memory").is_dir()
+    if memory:
+        signals.append(".agents/memory")
+    lockfile = any((root / f).exists() for f, _ in LOCKFILES) or (root / "Cargo.lock").exists()
+    if lockfile:
+        signals.append("lockfile")
+    existing = (bool(manifests or xcode) and bool(code_dirs or lockfile or memory)) or len(code_dirs) >= 2
+    return {
+        "mode": "existing" if existing else "fresh",
+        "signals": signals,
+        "manifests": manifests + xcode,
+        "code_dirs": code_dirs,
+        "git": (root / ".git").exists(),
+        "agents_memory": memory,
+        "commands": commands(root, manifests),
+    }
+
+
+FIRST_STEP = {
+    "vitrine": "Initialiser Astro + Tailwind dans `site/`, convertir les tokens du design system en "
+               "`site/src/styles/tokens.css`, puis porter {screen} en `site/src/pages/index.astro`",
+    "dashboard": "Créer `web/` (SvelteKit + Tailwind) et `api/` (Rust Axum + SQLx), brancher les tokens dans "
+                 "`web/src/app.css`, puis porter {screen} en {route}",
+    "desktop": "Initialiser Tauri 2 dans `app/` (`npm create tauri-app@latest`), brancher les tokens, "
+               "puis porter {screen} dans `app/src/`",
+    "ios": "Créer le projet Xcode SwiftUI dans `ios/`, traduire les tokens en `Theme.swift`, puis porter {screen} "
+           "en première vue SwiftUI",
+    "android": "Créer le projet Jetpack Compose dans `android/`, traduire les tokens en `Theme.kt`, puis porter "
+               "{screen} en premier écran Compose",
+    "backend": "Initialiser `api/` (Rust Axum + SQLx + PostgreSQL), écrire la première migration et l'endpoint {endpoint}",
+}
+
+
+def endpoint_for(screen, contract):
+    if set(screen["features"]) & {"auth", "signup"} and contract["auth"]:
+        return "POST /api/auth/login"
+    if screen["table_columns"]:
+        return f"GET /api/{slug(screen['title'])}"
+    return contract["endpoints"][0] if contract["endpoints"] else None
+
+
+def next_step(state, intent, frameworks, screens, contract):
+    """Action précise par laquelle commencer, écrite dans .agents/memory/etat.md."""
+    views = [s for s in screens if s["kind"] in ("page", "demo")]
+    auth = next((s for s in views if "auth" in s["features"]), None)
+    first = auth or next((s for s in views if s["kind"] == "page"), None) or (views[0] if views else None)
+    if state["mode"] == "existing":
+        start = state["commands"].get("run")
+        prefix = (f"Lancer le projet existant (`{start}`) et vérifier qu'il démarre, puis " if start else
+                  "Vérifier que le projet existant compile, puis ")
+        mock = next((s for s in views if s["status"] == "mock-data"), None)
+        target = mock or (auth if auth and auth["status"] != "wired" else None)
+        endpoint = endpoint_for(target, contract) if target else None
+        if endpoint:
+            return prefix + f"remplacer les données factices de `{target['path']}` par l'appel `{endpoint}`"
+        return prefix + "reprendre la première tâche ouverte du plan (`docs/superpowers/plans/`)"
+    if intent["ambiguous"] or not intent["primary"]:
+        return ("Confirmer ce que tu construis (site vitrine, dashboard, desktop, iOS, Android), "
+                "puis relancer `detect_project.py scan` pour fixer la stack")
+    screen = f"`{first['path']}`" if first else "le premier écran du design"
+    route = "`web/src/routes/(auth)/login`" if auth else "première route de `web/src/routes/`"
+    endpoint = (endpoint_for(first, contract) if first else None) or \
+        (contract["endpoints"][0] if contract["endpoints"] else "GET /api/health")
+    step = FIRST_STEP[intent["primary"]].format(screen=screen, route=route, endpoint=f"`{endpoint}`")
+    kept = [f for f in frameworks if f in ("react", "next", "svelte", "sveltekit", "vue", "nuxt", "astro")]
+    if kept:
+        step += f" (ou garder {', '.join(kept)} déjà utilisé par le design — à confirmer)"
+    return step
 
 
 def score_intents(paths, texts):
@@ -263,10 +391,9 @@ def backend_contract(screens):
     }
 
 
-def scan(root, out):
+def analyse(root):
+    """Analyse complète, sans rien écrire ni afficher (utilisée aussi par scaffold_memory.py)."""
     root = Path(root).resolve()
-    if not root.is_dir():
-        sys.exit(f"Dossier introuvable : {root}")
     paths, texts, screens = [], {}, []
     for p in walk(root):
         rel = p.relative_to(root).as_posix()
@@ -278,9 +405,13 @@ def scan(root, out):
     scores, evidence = score_intents(paths, texts)
     best, secondary, ambiguous = decide(scores, screens)
     intents = [best] + secondary if best else []
+    frameworks = detect_frameworks(root)
+    state = project_state(root)
+    contract = backend_contract([s for s in screens if s["kind"] != "component"] or screens)
     result = {
         "root": str(root),
-        "frameworks": detect_frameworks(root),
+        "project": state,
+        "frameworks": frameworks,
         "intent": {
             "primary": best,
             "secondary": secondary,
@@ -293,8 +424,16 @@ def scan(root, out):
         },
         "recommended_stack": {i: STACKS[i] for i in intents},
         "screens": screens,
-        "backend_contract": backend_contract([s for s in screens if s["kind"] != "component"] or screens),
+        "backend_contract": contract,
     }
+    result["next_step"] = next_step(state, result["intent"], frameworks, screens, contract)
+    return result
+
+
+def scan(root, out):
+    if not Path(root).is_dir():
+        sys.exit(f"Dossier introuvable : {Path(root).resolve()}")
+    result = analyse(root)
     if out:
         Path(out).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print_summary(result, out)
@@ -303,7 +442,13 @@ def scan(root, out):
 
 def print_summary(r, out):
     it = r["intent"]
+    st = r["project"]
     label = INTENTS.get(it["primary"], "indéterminée")
+    if st["mode"] == "existing":
+        print(f"Projet DÉJÀ COMMENCÉ ({', '.join(st['signals'])}) → mode « nettoyer + compléter l'infra agents », "
+              "pas de restructuration")
+    else:
+        print("Export de design à structurer (mode fresh)")
     print(f"Intention : {label}" + (" (AMBIGUË — poser les questions)" if it["ambiguous"] else ""))
     if it["secondary"]:
         print("  + " + ", ".join(INTENTS[i] for i in it["secondary"]))
@@ -321,6 +466,7 @@ def print_summary(r, out):
           f"entités={list(bc['entities']) or '-'} ({len(bc['endpoints'])} endpoints)")
     for q in it["questions"]:
         print(f"  ? {q}")
+    print(f"Prochaine étape : {r['next_step']}")
     if out:
         print(f"→ {out}")
 

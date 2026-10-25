@@ -3,6 +3,7 @@
 
 usage: scaffold_memory.py <projet> --name "<Nom>" [--agents claude,codex,cursor,gemini,copilot]
                           [--file-map <file-map.json>] [--private-memory] [--python <interpréteur>]
+                          [--inventory <design-inventory.json>] [--next-step "<action>"] [--no-detect]
        scaffold_memory.py <projet> --check     vérifie l'installation sans rien écrire
        scaffold_memory.py <projet> --update    met à jour le hook et les blocs gérés
 
@@ -12,10 +13,13 @@ Chaque agent est branché dessus : AGENTS.md (Codex, Cursor, Copilot…), CLAUDE
 
 Ne remplace jamais un fichier de mémoire existant. Les fichiers d'instructions et de hooks ne sont
 modifiés qu'entre les marqueurs design-to-dev ou sur les entrées qui pointent vers memory_hook.py.
+etat.md est pré-rempli (objectif détecté, prochaine étape exacte, commandes) à partir de
+detect_project.py : lu dans --inventory, sinon analyse en lecture seule du projet.
 Stdlib uniquement.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -85,7 +89,71 @@ def write_changed(path, text):
 
 # ---------------------------------------------------------------- mémoire texte
 
-def memory_files(name, stamp, changes, origin):
+# ---------------------------------------------------------------- détection (etat.md pré-rempli)
+
+def load_detect():
+    # chargé par chemin : `python -I` ne met pas le dossier du script dans sys.path
+    spec = importlib.util.spec_from_file_location("detect_project", SKILL / "scripts" / "detect_project.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def detect(project, inventory, no_detect):
+    if inventory:
+        return json.loads(Path(inventory).read_text(encoding="utf-8"))
+    if no_detect:
+        return None
+    try:
+        return load_detect().analyse(project)
+    except Exception as e:  # la mémoire s'installe même si la détection échoue
+        notes.append(f"détection du projet impossible ({e}) : etat.md à compléter à la main")
+        return None
+
+
+def etat_context(name, scan, next_step):
+    """Valeurs de etat.md ; sans détection, les mêmes [À compléter] qu'avant."""
+    ctx = {"objective": f"[À compléter : ce que {name} doit accomplir, en 1-3 lignes]",
+           "task": "Préproduction — statut : EN ATTENTE DE VALIDATION",
+           "next": next_step or "[À compléter : action précise pour démarrer le développement]",
+           "install": "[à compléter]", "run": "[à compléter]",
+           "questions": ["[à compléter]"], "watch": ["[à compléter]"], "status": None}
+    if not scan:
+        return ctx
+    intent, state = scan.get("intent", {}), scan.get("project", {})
+    labels = load_detect().INTENTS
+    if intent.get("primary"):
+        extra = ", ".join(labels.get(i, i) for i in intent.get("secondary", []))
+        ctx["objective"] = (f"{labels.get(intent['primary'], intent['primary'])}" + (f" + {extra}" if extra else "")
+                            + " — détecté par design-to-dev, à confirmer")
+    if state.get("mode") == "existing":
+        ctx["task"] = "Infra agents ajoutée à un projet existant — statut : PRÊT, développement en cours"
+        ctx["status"] = "projet existant, infra agents ajoutée"
+    ctx["next"] = next_step or scan.get("next_step") or ctx["next"]
+    cmds = state.get("commands", {})
+    ctx["install"] = f"`{cmds['install']}`" if cmds.get("install") else ctx["install"]
+    run = " ; ".join(f"`{cmds[k]}`" for k in ("run", "test") if cmds.get(k))
+    ctx["run"] = run or ctx["run"]
+    ctx["questions"] = intent.get("questions") or ctx["questions"]
+    watch = []
+    if intent.get("ambiguous"):
+        watch.append("intention non confirmée : ne pas fixer la stack avant la réponse de l'utilisateur")
+    mocks = [s["path"] for s in scan.get("screens", []) if s.get("status") == "mock-data" and s.get("kind") != "component"]
+    if mocks:
+        watch.append(f"{len(mocks)} écran(s) encore sur données factices : " + ", ".join(f"`{m}`" for m in mocks[:5])
+                     + (" …" if len(mocks) > 5 else ""))
+    contract = scan.get("backend_contract", {})
+    if contract.get("auth"):
+        watch.append("connexion présente : Argon2id, cookies HttpOnly, rate limit (voir docs/security/exigences.md)")
+    ctx["watch"] = watch or ["aucun point relevé par la détection"]
+    return ctx
+
+
+def bullets(items):
+    return "\n".join(f"- {i}" for i in items)
+
+
+def memory_files(name, stamp, changes, origin, ctx):
     memory_index = f"""# Mémoire du projet {name}
 
 Index de la mémoire partagée entre agents (Claude Code, Codex, Cursor, Gemini…).
@@ -94,7 +162,7 @@ Protocole : `PROTOCOLE.md` (obligatoire). Graphe : `GRAPHE.md`.
 ## Résumé
 - Projet : {name}
 - Origine : {origin}
-- Statut : préproduction terminée, développement non commencé
+- Statut : {ctx["status"] or "préproduction terminée, développement non commencé"}
 
 ## Fichiers
 - [etat.md](etat.md) — état courant et prochaine étape (lire en premier)
@@ -109,16 +177,16 @@ Protocole : `PROTOCOLE.md` (obligatoire). Graphe : `GRAPHE.md`.
     etat = f"""# État courant — mis à jour le {stamp}
 
 ## Objectif global
-[À compléter : ce que {name} doit accomplir, en 1-3 lignes]
+{ctx["objective"]}
 
 ## Tâche en cours
-Préproduction — statut : EN ATTENTE DE VALIDATION
+{ctx["task"]}
 
 ## Fait récemment
 - Mémoire partagée `.agents/memory/`, graphe et hooks installés
 
 ## Prochaine étape exacte
-[À compléter : action précise pour démarrer le développement]
+{ctx["next"]}
 
 ## Action en cours au moment de l'arrêt (si applicable)
 - Commande / modification : aucune
@@ -126,17 +194,17 @@ Préproduction — statut : EN ATTENTE DE VALIDATION
 - Résultat connu : terminé
 
 ## Commandes pour reprendre
-- Installer : [à compléter]
-- Lancer / tester : [à compléter]
+- Installer : {ctx["install"]}
+- Lancer / tester : {ctx["run"]}
 
 ## Fichiers clés touchés dans cette tâche
 - [à compléter]
 
 ## Questions ouvertes pour l'utilisateur
-- [à compléter]
+{bullets(ctx["questions"])}
 
 ## Points de vigilance
-- [à compléter]
+{bullets(ctx["watch"])}
 """
     journal = f"""# Journal (append-only)
 
@@ -408,6 +476,9 @@ def main():
                     help="interpréteur écrit dans les hooks Claude Code et AGENTS.md")
     ap.add_argument("--check", action="store_true", help="vérifie l'installation sans rien écrire")
     ap.add_argument("--update", action="store_true", help="remplace le hook s'il n'a pas été modifié à la main")
+    ap.add_argument("--inventory", help="design-inventory.json de detect_project.py (sinon analyse du projet)")
+    ap.add_argument("--next-step", help="prochaine étape exacte écrite dans etat.md (remplace celle détectée)")
+    ap.add_argument("--no-detect", action="store_true", help="ne pas analyser le projet : etat.md reste à compléter")
     a = ap.parse_args()
 
     project = Path(a.project).resolve()
@@ -434,7 +505,9 @@ def main():
     mem = project / ".agents" / "memory"
     origin = (f"export de design réorganisé le {stamp} (voir `docs/cleanup/report.md`)" if a.file_map
               else f"mémoire installée le {stamp} sur un projet existant")
-    for fname, text in memory_files(name, stamp, changes_from_map(a.file_map, stamp), origin).items():
+    etat_existed = (mem / "etat.md").exists()
+    ctx = etat_context(name, None if etat_existed else detect(project, a.inventory, a.no_detect), a.next_step)
+    for fname, text in memory_files(name, stamp, changes_from_map(a.file_map, stamp), origin, ctx).items():
         write_new(mem / fname, text)
     write_new(mem / "archives" / ".gitkeep", "")
     for fname in ("PROTOCOLE.md", "GRAPHE.md"):
@@ -527,7 +600,13 @@ def main():
               "(ouvrir `codex` dans le projet, accepter la confiance, puis valider les hooks avec /hooks).")
         print("  Codex : la mémoire native (~/.codex/memories) reste un rappel personnel ; pour l'activer, "
               "[features] memories = true dans ~/.codex/config.toml. Ce script ne modifie pas ce fichier.")
-    print("À remplir à la main : .agents/memory/etat.md (objectif, prochaine étape), decisions.md, problemes.md.")
+    if etat_existed:
+        print("etat.md existait déjà : conservé tel quel.")
+    elif ctx["next"].startswith("[À compléter"):
+        print("À remplir à la main : .agents/memory/etat.md (objectif, prochaine étape), decisions.md, problemes.md.")
+    else:
+        print(f"Prochaine étape (écrite dans .agents/memory/etat.md) : {ctx['next']}")
+        print("À vérifier : objectif dans etat.md ; à remplir : decisions.md, problemes.md.")
     if any(ok is not True for ok in tests.values()):
         sys.exit(1)
 

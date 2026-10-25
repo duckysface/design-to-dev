@@ -2,7 +2,9 @@
 
 # 🎨 → 💻 design-to-dev
 
-**Transforme un dossier de design désordonné en projet prêt pour la production — sans redessiner ce qui existe déjà.**
+**Skill de pré-production — transforme n'importe quel export design (Claude Design, Figma, v0, Lovable…) en projet prêt à coder, avec une structure propre et une mémoire multi-agents déjà configurée.**
+
+*Le nettoyage n'est qu'une étape. Le vrai produit, c'est le projet agent-ready dès le premier jour.*
 
 Skill pour **Claude Code** et **Codex** · mémoire partagée avec Cursor, Gemini CLI, Copilot · Python 3.9+ (stdlib) · Windows, macOS, Linux
 
@@ -14,6 +16,25 @@ Skill pour **Claude Code** et **Codex** · mémoire partagée avec Cursor, Gemin
 [![npm](https://img.shields.io/npm/v/design-to-dev?color=cb3837)](https://www.npmjs.com/package/design-to-dev)
 
 </div>
+
+---
+
+## 🧠 Juste la mémoire ? Une commande
+
+Ton projet est déjà rangé, ou déjà commencé ? Pas besoin du reste :
+
+```bash
+npx design-to-dev init .
+```
+
+En quelques secondes, sans toucher à ton code : mémoire `.agents/` partagée, hooks Claude Code + Codex, `AGENTS.md`, et un
+`etat.md` **déjà rempli** — ce que tu construis, les commandes du projet (`pnpm install`, `pnpm run dev`…) et la **prochaine
+étape exacte**, par exemple :
+
+> Lancer le projet existant (`pnpm run dev`) et vérifier qu'il démarre, puis remplacer les données factices de
+> `src/pages/OrdersPage.tsx` par l'appel `GET /api/orders`
+
+Le prochain agent qui ouvre le projet sait où reprendre. Détails : [mémoire seule](#juste-la-mémoire-sur-un-projet-existant).
 
 ---
 
@@ -33,6 +54,10 @@ Mon Design System/
 ```
 
 **design-to-dev** trie tout ça, propose une arborescence propre, **attend ton accord**, puis construit une copie réorganisée avec tous les chemins corrigés. Le dossier d'origine n'est jamais touché. Le projet sort avec une **mémoire partagée** que tous tes agents de code lisent et tiennent à jour.
+
+Le dossier est **déjà un projet commencé** (`package.json`, `src/`, lockfile…) ? La skill le détecte et passe en mode
+« nettoyer + compléter l'infra agents » : elle garde ta structure, retire seulement les déchets et ajoute la mémoire, au lieu de
+tout réorganiser.
 
 Et comme tes pages et démos sont souvent déjà faites, la skill les **repère, les garde et prévoit de les brancher au backend** au lieu de les refaire. Elle devine ce que tu construis (site vitrine, dashboard, app desktop, iOS, Android), te pose la question si ce n'est pas clair, range le projet selon la stack adaptée, écrit le plan avec **superpowers** et pose une **base de sécurité** avant d'écrire le backend.
 
@@ -160,12 +185,17 @@ Les outils d'analyse marchent aussi seuls, sans agent :
 
 ### Juste la mémoire, sur un projet existant
 
-Pas besoin de passer par le nettoyage :
+Pas besoin de passer par le nettoyage. `init` analyse le projet en lecture seule et pré-remplit `etat.md` (objectif détecté,
+commandes, prochaine étape, points de vigilance) ; un `etat.md` existant n'est jamais écrasé.
 
 ```bash
+npx design-to-dev init .                                   # claude + codex
 npx design-to-dev init . --agents claude,codex,cursor
-npx design-to-dev init . --check     # contrôle sans rien écrire
-npx design-to-dev init . --update    # met à jour le hook
+npx design-to-dev init . --next-step "Créer le monorepo avec apps/web et packages/ui"
+npx design-to-dev init . --inventory design-inventory.json # reprend un scan déjà fait
+npx design-to-dev init . --no-detect                       # etat.md vierge, à remplir
+npx design-to-dev init . --check                           # contrôle sans rien écrire
+npx design-to-dev init . --update                          # met à jour le hook
 ```
 
 ---

@@ -1,12 +1,14 @@
 ---
 name: design-to-dev
-description: Nettoie et réorganise n'importe quel dossier de design system ou de maquettes (export Claude Design, Figma, v0, Lovable, Bolt, dossier fait main) en projet prêt pour la production — inventaire, détection de l'intention (site vitrine, dashboard, desktop, iOS, Android, backend), équipe de sous-agents qui analyse le design et repère les pages/démos déjà faites pour les réutiliser et les brancher au backend au lieu de les redessiner, arborescence adaptée à la stack conseillée (Astro, SvelteKit/Next.js + Rust Axum, Tauri, SwiftUI, Compose), plan de projet via superpowers, base de sécurité (OWASP ASVS, CWE) puis audit Cloudflare security-audit, mémoire multi-agents .agents/ et hooks. À utiliser quand l'utilisateur dit « organise ce dossier », « nettoie ce design system », « prépare ce projet pour le dev / la prod », « passe ce design en production », « branche ce design au backend ».
+description: Skill de pré-production — transforme n'importe quel export design ou dossier de maquettes (Claude Design, Figma, v0, Lovable, Bolt, fait main) en projet prêt à coder et agent-ready dès le premier jour — mémoire multi-agents .agents/ déjà configurée avec la prochaine étape exacte dans etat.md, détection d'un projet déjà commencé (nettoyer + compléter l'infra agents, sans restructurer), inventaire, détection de l'intention (site vitrine, dashboard, desktop, iOS, Android, backend), équipe de sous-agents qui analyse le design et repère les pages/démos déjà faites pour les réutiliser et les brancher au backend au lieu de les redessiner, arborescence adaptée à la stack conseillée (Astro, SvelteKit/Next.js + Rust Axum, Tauri, SwiftUI, Compose), plan de projet via superpowers, base de sécurité (OWASP ASVS, CWE) puis audit Cloudflare security-audit, mémoire multi-agents .agents/ et hooks. À utiliser quand l'utilisateur dit « organise ce dossier », « rends ce projet agent-ready », « ajoute la mémoire multi-agents », « nettoie ce design system », « prépare ce projet pour le dev / la prod », « passe ce design en production », « branche ce design au backend ».
 user-invocable: true
 ---
 
 # design-to-dev
 
-Transforme un dossier de design désordonné en projet de développement propre, organisé selon ce que l'utilisateur veut construire, avec un plan de production et une base de sécurité — prêt pour n'importe quel agent de code (Claude Code, Codex, Cursor, Gemini CLI, Copilot).
+Skill de pré-production : transforme un export de design en projet prêt à coder, organisé selon ce que l'utilisateur veut construire, avec un plan de production, une base de sécurité et une **mémoire multi-agents déjà configurée** (Claude Code, Codex, Cursor, Gemini CLI, Copilot). Le nettoyage n'est qu'une étape : le livrable, c'est un projet agent-ready dès le premier jour, dont `etat.md` dit déjà par quoi commencer.
+
+**Raccourci — mémoire seule.** Si l'utilisateur veut juste la mémoire, ou si le dossier est déjà propre : `npx design-to-dev init <dossier>` (ou `python "$SKILL/scripts/scaffold_memory.py" <dossier>`) suffit, sans les étapes 1 à 5. Le proposer dès qu'aucun nettoyage n'est nécessaire.
 
 **Règles absolues :**
 - Le dossier source n'est JAMAIS modifié. Le résultat est construit dans un nouveau dossier cible (rollback = supprimer la cible).
@@ -33,7 +35,12 @@ python "$SKILL/scripts/detect_project.py" scan "<source>" --out "<scratchpad>/de
 - `inventory` : pour chaque fichier, type, taille, hash (doublons), références entrantes/sortantes, orphelins, signaux (`generated`, `tool-artifact`, `os-junk`, `duplicate`, `backup-copy`, `personal-data?`, `large`…).
 - `scan` : intention estimée (primaire, secondaires, `ambiguous`), frameworks déjà présents, chaque écran (`page` / `demo` / `fragment` / `component`, fonctionnalités, champs, colonnes, appels API, données mock, statut `static` / `mock-data` / `wired`), premier contrat backend (auth, rôles, entités, endpoints) et stack conseillée.
 
-Lire les résumés affichés, pas tout le JSON.
+Lire les résumés affichés, pas tout le JSON. `scan` donne aussi `project.mode` et `next_step` (prochaine étape exacte).
+
+### 1b — Projet déjà commencé ? (`project.mode`)
+
+- `fresh` : export de design à structurer → étapes 2 à 9 normalement.
+- `existing` (manifeste + code, lockfile ou plusieurs dossiers de code) : **mode « nettoyer + compléter l'infra agents »**. Ne pas réorganiser l'arborescence ni porter la stack. L'équipe nettoyage ne propose que des `delete` de déchets évidents (`os-junk`, `tool-artifact`, `backup-copy`, doublons exacts) et l'équipe design se limite à `screens` + `data-contract` pour `docs/design/screens.md`. Si rien n'est à nettoyer, proposer directement l'étape 6 seule (`init`). Travailler dans le dossier lui-même seulement avec l'accord explicite de l'utilisateur et un worktree git propre ; sinon copie dans une cible comme d'habitude.
 
 ## Étape 2 — Analyse par sous-agents (en parallèle, un seul message)
 
@@ -88,12 +95,14 @@ Créer dans la cible (s'ils n'existent pas) :
 ## Étape 6 — Mémoire multi-agents
 
 ```bash
-python "$SKILL/scripts/scaffold_memory.py" "<cible>" --name "<Nom du projet>" --file-map "<cible>/docs/cleanup/file-map.json" --agents claude,codex [--private-memory]
+python "$SKILL/scripts/scaffold_memory.py" "<cible>" --name "<Nom du projet>" --file-map "<cible>/docs/cleanup/file-map.json" --inventory "<scratchpad>/design-inventory.json" --agents claude,codex [--private-memory] [--next-step "<action>"]
 ```
 
 Crée sans écraser : `.agents/memory/` (`MEMORY.md`, `etat.md`, `journal.md`, `changements.md`, `decisions.md`, `problemes.md`, `PROTOCOLE.md`, `GRAPHE.md`), `.agents/hooks/memory_hook.py`, `.agents/graph/graph.json`, `AGENTS.md` (bloc géré), et selon `--agents` : `CLAUDE.md` + `.claude/settings.json`, `.codex/hooks.json`, `.cursor/rules/`, `GEMINI.md`, `.github/copilot-instructions.md`. Auto-test des hooks à la fin. `--check` vérifie, `--update` met à jour le hook.
 
-Puis remplir à la main : `etat.md` (objectif, prochaine étape exacte, commandes, points de vigilance), `decisions.md` (intention, stack, arborescence, écrans réutilisés — « Validée par : utilisateur »), `problemes.md`, `journal.md`. Notes durables : `python .agents/hooks/memory_hook.py note <sujet> "<fait>"`.
+`etat.md` sort pré-rempli depuis la détection (objectif, prochaine étape exacte, commandes, questions, points de vigilance) ; un `etat.md` existant est conservé. Si l'intention ou la stack confirmée à l'étape 2b diffère du `next_step` détecté, passer `--next-step` avec l'action exacte (ex. « Créer le monorepo avec apps/web et packages/ui »).
+
+Puis affiner : `etat.md` (objectif confirmé, prochaine étape si la stack a changé), `decisions.md` (intention, stack, arborescence, écrans réutilisés — « Validée par : utilisateur »), `problemes.md`, `journal.md`. Notes durables : `python .agents/hooks/memory_hook.py note <sujet> "<fait>"`.
 
 ## Étape 7 — Plan du projet (superpowers)
 

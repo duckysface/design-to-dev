@@ -13,6 +13,7 @@ from pathlib import Path
 SKILL = Path(__file__).resolve().parent.parent
 DETECT = SKILL / "scripts" / "detect_project.py"
 SECURITY = SKILL / "scripts" / "security_check.py"
+SCAFFOLD = SKILL / "scripts" / "scaffold_memory.py"
 PY = sys.executable
 
 LOGIN = ('<html><head><title>Connexion Admin</title></head><body><form>'
@@ -89,6 +90,67 @@ class ProjectTest(unittest.TestCase):
         r = run([DETECT, "scan", empty, "--out", self.inv])
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertTrue(json.loads(self.inv.read_text(encoding="utf-8"))["intent"]["ambiguous"])
+
+    # ---- mode fresh / existing et prochaine étape
+
+    def make_existing(self):
+        app = self.tmp / "app"
+        (app / "src" / "pages").mkdir(parents=True)
+        (app / "package.json").write_text('{"scripts": {"dev": "vite", "test": "vitest"}}', encoding="utf-8")
+        (app / "pnpm-lock.yaml").write_text("", encoding="utf-8")
+        (app / "src" / "pages" / "OrdersPage.tsx").write_text(
+            "<table><tr><th>Nom</th></tr></table><script>const mockOrders = [{}];</script>", encoding="utf-8")
+        return app
+
+    def test_design_export_is_fresh_with_concrete_next_step(self):
+        r = self.scan()
+        self.assertEqual(r["project"]["mode"], "fresh")
+        self.assertIn("SvelteKit", r["next_step"])
+        self.assertIn("login.html", r["next_step"])
+        self.assertIn("(auth)/login", r["next_step"])
+
+    def test_started_project_is_existing(self):
+        app = self.make_existing()
+        r = run([DETECT, "scan", app, "--out", self.inv])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        data = json.loads(self.inv.read_text(encoding="utf-8"))
+        self.assertEqual(data["project"]["mode"], "existing")
+        self.assertEqual(data["project"]["commands"]["run"], "pnpm run dev")
+        self.assertIn("`pnpm run dev`", data["next_step"])
+        self.assertIn("GET /api/orders", data["next_step"])
+        self.assertIn("DÉJÀ COMMENCÉ", r.stdout)
+
+    def test_ambiguous_next_step_asks_first(self):
+        empty = self.tmp / "vide"
+        empty.mkdir()
+        run([DETECT, "scan", empty, "--out", self.inv])
+        self.assertIn("Confirmer ce que tu construis", json.loads(self.inv.read_text(encoding="utf-8"))["next_step"])
+
+    def test_init_prefills_etat(self):
+        app = self.make_existing()
+        r = run([SCAFFOLD, app, "--agents", "cursor", "--python", PY])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        etat = (app / ".agents" / "memory" / "etat.md").read_text(encoding="utf-8")
+        self.assertIn("GET /api/orders", etat)
+        self.assertIn("`pnpm install`", etat)
+        self.assertIn("projet existant", etat)
+        self.assertNotIn("[À compléter : action précise", etat)
+
+    def test_init_next_step_override_and_inventory(self):
+        self.scan()
+        target = self.tmp / "cible"
+        target.mkdir()
+        r = run([SCAFFOLD, target, "--agents", "cursor", "--python", PY, "--inventory", self.inv,
+                 "--next-step", "Créer le monorepo apps/web + packages/ui"])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        etat = (target / ".agents" / "memory" / "etat.md").read_text(encoding="utf-8")
+        self.assertIn("Créer le monorepo apps/web + packages/ui", etat)
+        self.assertIn("Dashboard web", etat)
+
+    def test_init_no_detect_keeps_placeholders(self):
+        app = self.make_existing()
+        run([SCAFFOLD, app, "--agents", "cursor", "--python", PY, "--no-detect"])
+        self.assertIn("[À compléter : action précise", (app / ".agents" / "memory" / "etat.md").read_text(encoding="utf-8"))
 
     # ---- detect_project.py skills
 

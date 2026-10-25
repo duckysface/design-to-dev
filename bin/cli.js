@@ -34,14 +34,17 @@ const AGENTS = {
   },
 };
 
-const HELP = `design-to-dev ${VERSION}
+const HELP = `design-to-dev ${VERSION} — export de design → projet agent-ready dès le premier jour
+
+Juste la mémoire, en 10 secondes, sur n'importe quel projet (rien d'autre n'est touché) :
+  npx design-to-dev init .               mémoire multi-agents + hooks + etat.md avec la prochaine étape détectée
 
 Usage :
   npx design-to-dev                      installation interactive (choix de l'agent)
   npx design-to-dev install [options]    installe ou met à jour la skill
   npx design-to-dev uninstall [options]  retire la skill
   npx design-to-dev run <dossier>        installe si besoin puis lance le workflow dans Claude Code ou Codex
-  npx design-to-dev init [dossier]       installe la mémoire multi-agents dans un projet existant
+  npx design-to-dev init [dossier]       mémoire multi-agents seule (projet neuf ou déjà commencé)
   npx design-to-dev doctor               vérifie Python, les installations et les skills compagnes
   npx design-to-dev path                 affiche le dossier de la skill installée ($SKILL)
 
@@ -68,6 +71,9 @@ Options de init :
   --agents <liste>    claude,codex,cursor,gemini,copilot (défaut : claude,codex)
   --private-memory    la mémoire n'est pas versionnée (.gitignore)
   --file-map <json>   pré-remplit changements.md depuis un file-map de nettoyage
+  --inventory <json>  reprend un design-inventory.json (sinon le projet est analysé en lecture seule)
+  --next-step "<txt>" impose la prochaine étape écrite dans etat.md
+  --no-detect         n'analyse pas le projet : etat.md reste à compléter
   --check             vérifie une installation existante sans rien écrire
   --update            met à jour le hook et les blocs gérés (hook modifié à la main : conservé)
 `;
@@ -85,6 +91,9 @@ function parseArgs(argv) {
     else if (a === "--agents") opts.agentList = next();
     else if (a === "--private-memory") opts.privateMemory = true;
     else if (a === "--file-map") opts.fileMap = next();
+    else if (a === "--inventory") opts.inventory = next();
+    else if (a === "--next-step") opts.nextStep = next();
+    else if (a === "--no-detect") opts.noDetect = true;
     else if (a === "--check") opts.check = true;
     else if (a === "--update") opts.update = true;
     else if (a === "--print") opts.print = true;
@@ -214,6 +223,9 @@ function init(opts) {
     if (opts.agentList) args.push("--agents", opts.agentList);
     if (opts.privateMemory) args.push("--private-memory");
     if (opts.fileMap) args.push("--file-map", path.resolve(opts.fileMap));
+    if (opts.inventory) args.push("--inventory", path.resolve(opts.inventory));
+    if (opts.nextStep) args.push("--next-step", opts.nextStep);
+    if (opts.noDetect) args.push("--no-detect");
     if (opts.update) args.push("--update");
   }
   const r = spawnSync(py, args, { stdio: "inherit" });
