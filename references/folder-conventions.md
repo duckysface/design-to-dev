@@ -77,6 +77,18 @@ Adapter si la stack est connue : Next.js → `src/app/` ; monorepo → `apps/web
 apps/{web,api,admin}/   packages/{ui,shared,config,database}/   pnpm-workspace.yaml | turbo.json | nx.json
 ```
 
+## Selon l'intention (voir `stacks.md`)
+
+| Intention | Racine cible | Les maquettes deviennent |
+|---|---|---|
+| Site vitrine | `site/` (Astro) [+ `api/`] | `site/src/pages/*.astro` |
+| Dashboard | `web/` (SvelteKit/Next) + `api/` (Axum) | `web/src/routes/(auth)/…`, `(app)/…`, `(admin)/…` |
+| Desktop | `app/src/` + `app/src-tauri/` | vues de `app/src/` |
+| Mobile | `core/` (Rust UniFFI) + `ios/` + `android/` | vues SwiftUI / écrans Compose |
+| Plusieurs | `apps/{site,web,desktop}/` + `api/` + `packages/ui/` | idem par app |
+
+Toujours : `prototypes/` garde les maquettes d'origine (référence visuelle) tant qu'elles ne sont pas portées ; `docs/design/screens.md` fait le lien écran → route → endpoint ; `docs/security/` reçoit les exigences et rapports d'audit.
+
 ## Règles d'or
 
 1. README clair d'abord (installer, lancer, tester, structure).

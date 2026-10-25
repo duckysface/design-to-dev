@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// design-to-dev — installe la skill pour Claude Code et/ou Codex, et prépare la mémoire d'un projet.
+// design-to-dev — installe la skill pour Claude Code et/ou Codex, lance le workflow, prépare la mémoire d'un projet.
 // Aucune dépendance : Node 18+ uniquement.
 "use strict";
 
@@ -21,12 +21,16 @@ const AGENTS = {
     user: () => path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"), "skills"),
     project: (dir) => path.join(dir, ".claude", "skills"),
     use: "/design-to-dev <dossier>",
+    cli: "claude",
+    prompt: (src) => `/design-to-dev ${src}`,
   },
   codex: {
     label: "Codex",
     user: () => path.join(os.homedir(), ".agents", "skills"),
     project: (dir) => path.join(dir, ".agents", "skills"),
     use: "$design-to-dev <dossier>",
+    cli: "codex",
+    prompt: (src) => `$design-to-dev ${src}`,
   },
 };
 
@@ -36,8 +40,21 @@ Usage :
   npx design-to-dev                      installation interactive (choix de l'agent)
   npx design-to-dev install [options]    installe ou met à jour la skill
   npx design-to-dev uninstall [options]  retire la skill
+  npx design-to-dev run <dossier>        installe si besoin puis lance le workflow dans Claude Code ou Codex
   npx design-to-dev init [dossier]       installe la mémoire multi-agents dans un projet existant
-  npx design-to-dev doctor               vérifie Python et les installations
+  npx design-to-dev doctor               vérifie Python, les installations et les skills compagnes
+  npx design-to-dev path                 affiche le dossier de la skill installée ($SKILL)
+
+Outils (lecture seule, sans agent) :
+  npx design-to-dev scan <dossier> [--out f.json]       intention, écrans/démos existants, contrat backend
+  npx design-to-dev inventory <dossier> [--out f.json]  inventaire des fichiers (refs, doublons, signaux)
+  npx design-to-dev security <dossier> [--out f.json]   base de sécurité statique (candidats, CWE/ASVS)
+  npx design-to-dev requirements --intent dashboard     exigences de sécurité par stack
+  npx design-to-dev skills                              superpowers et security-audit installées ?
+
+Options de run :
+  --claude | --codex  agent à lancer (défaut : celui qui est installé, Claude Code en priorité)
+  --print             affiche seulement la commande à lancer
 
 Options d'installation :
   --claude            Claude Code  (~/.claude/skills/design-to-dev)
@@ -70,6 +87,7 @@ function parseArgs(argv) {
     else if (a === "--file-map") opts.fileMap = next();
     else if (a === "--check") opts.check = true;
     else if (a === "--update") opts.update = true;
+    else if (a === "--print") opts.print = true;
     else if (a === "-h" || a === "--help") opts.help = true;
     else if (a === "-v" || a === "--version") opts.version = true;
     else if (a.startsWith("-")) fail(`Option inconnue : ${a}\n\n${HELP}`);
@@ -202,6 +220,78 @@ function init(opts) {
   process.exit(r.status ?? 1);
 }
 
+// Commandes qui passent leurs arguments tels quels à un script Python de la skill.
+const PY_TOOLS = {
+  scan: ["detect_project.py", "scan"],
+  skills: ["detect_project.py", "skills"],
+  inventory: ["organize.py", "inventory"],
+  security: ["security_check.py", "scan"],
+  requirements: ["security_check.py", "requirements"],
+};
+
+function pyTool(cmd, rest) {
+  const py = findPython();
+  if (!py) fail("Python 3.9+ est nécessaire.");
+  const [script, sub] = PY_TOOLS[cmd];
+  const r = spawnSync(py, [path.join(PKG_ROOT, "scripts", script), sub, ...rest], { stdio: "inherit" });
+  process.exit(r.status ?? 1);
+}
+
+function installedDir() {
+  for (const cfg of Object.values(AGENTS)) {
+    const dir = path.join(cfg.user(), SKILL_NAME);
+    if (isOurSkill(dir)) return dir;
+  }
+  return null;
+}
+
+function hasCli(cmd) {
+  const r = process.platform === "win32"
+    ? spawnSync(`${cmd} --version`, { encoding: "utf8", shell: true })
+    : spawnSync(cmd, ["--version"], { encoding: "utf8" });
+  return r.status === 0;
+}
+
+// cmd.exe : guillemets doubles (internes doublés) ; POSIX : guillemets simples
+function shellQuote(arg) {
+  if (/^[\w./:\-]+$/.test(arg)) return arg;
+  return process.platform === "win32" ? `"${arg.replace(/"/g, '""')}"` : `'${arg.replace(/'/g, "'\''")}'`;
+}
+
+async function run(opts) {
+  const source = opts._[1];
+  if (!source) fail("Usage : npx design-to-dev run <dossier> [--claude|--codex]");
+  const src = path.resolve(source);
+  if (!fs.existsSync(src) || !fs.statSync(src).isDirectory()) fail(`Dossier introuvable : ${src}`);
+  let agent = opts.agents[0];
+  if (!agent) {
+    agent = ["claude", "codex"].find((a) => isOurSkill(path.join(AGENTS[a].user(), SKILL_NAME)) && hasCli(AGENTS[a].cli))
+      || ["claude", "codex"].find((a) => hasCli(AGENTS[a].cli)) || "claude";
+  }
+  const cfg = AGENTS[agent];
+  const prompt = cfg.prompt(/\s/.test(src) ? `"${src}"` : src);
+  const command = `${cfg.cli} ${shellQuote(prompt)}`;
+  if (opts.print) return console.log(command);
+  if (!isOurSkill(path.join(cfg.user(), SKILL_NAME))) {
+    console.log(`Installation de la skill pour ${cfg.label}…`);
+    await installOne(agent, { ...opts, yes: true, project: null });
+  }
+  if (!hasCli(cfg.cli)) {
+    console.log(`
+${cfg.label} (${cfg.cli}) introuvable dans le PATH. Lancer l'agent dans ${path.dirname(src)} puis taper :
+
+  ${prompt}
+`);
+    return;
+  }
+  console.log(`Lancement de ${cfg.label} : ${prompt}
+`);
+  const r = process.platform === "win32"
+    ? spawnSync(command, { stdio: "inherit", shell: true, cwd: path.dirname(src) })
+    : spawnSync(cfg.cli, [prompt], { stdio: "inherit", cwd: path.dirname(src) });
+  process.exit(r.status ?? 1);
+}
+
 function doctor() {
   const py = findPython();
   console.log(`design-to-dev ${VERSION}`);
@@ -211,11 +301,17 @@ function doctor() {
     const ver = fs.existsSync(path.join(dst, ".version")) ? fs.readFileSync(path.join(dst, ".version"), "utf8").trim() : null;
     console.log(`  ${cfg.label.padEnd(12)}: ${isOurSkill(dst) ? `installée (${ver || "version inconnue"}) — ${dst}` : "non installée"}`);
   }
+  if (py) {
+    console.log("\nSkills compagnes :");
+    spawnSync(py, [path.join(PKG_ROOT, "scripts", "detect_project.py"), "skills"], { stdio: "inherit" });
+  }
   if (!py) process.exit(1);
 }
 
 async function main() {
-  const opts = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  if (PY_TOOLS[argv[0]]) return pyTool(argv[0], argv.slice(1));
+  const opts = parseArgs(argv);
   if (opts.version) return console.log(VERSION);
   if (opts.help) return console.log(HELP);
   const cmd = opts._[0] || "install";
@@ -223,6 +319,12 @@ async function main() {
   if (cmd === "uninstall" || cmd === "remove") return uninstall(opts);
   if (cmd === "init") return init(opts);
   if (cmd === "doctor") return doctor();
+  if (cmd === "run") return run(opts);
+  if (cmd === "path") {
+    const dir = installedDir();
+    if (!dir) fail("design-to-dev n'est pas installée (npx design-to-dev install).");
+    return console.log(dir);
+  }
   fail(`Commande inconnue : ${cmd}\n\n${HELP}`);
 }
 

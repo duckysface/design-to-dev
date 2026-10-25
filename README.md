@@ -2,7 +2,7 @@
 
 # 🎨 → 💻 design-to-dev
 
-**Transforme un dossier de design désordonné en projet prêt pour le développement.**
+**Transforme un dossier de design désordonné en projet prêt pour la production — sans redessiner ce qui existe déjà.**
 
 Skill pour **Claude Code** et **Codex** · mémoire partagée avec Cursor, Gemini CLI, Copilot · Python 3.9+ (stdlib) · Windows, macOS, Linux
 
@@ -34,6 +34,8 @@ Mon Design System/
 
 **design-to-dev** trie tout ça, propose une arborescence propre, **attend ton accord**, puis construit une copie réorganisée avec tous les chemins corrigés. Le dossier d'origine n'est jamais touché. Le projet sort avec une **mémoire partagée** que tous tes agents de code lisent et tiennent à jour.
 
+Et comme tes pages et démos sont souvent déjà faites, la skill les **repère, les garde et prévoit de les brancher au backend** au lieu de les refaire. Elle devine ce que tu construis (site vitrine, dashboard, app desktop, iOS, Android), te pose la question si ce n'est pas clair, range le projet selon la stack adaptée, écrit le plan avec **superpowers** et pose une **base de sécurité** avant d'écrire le backend.
+
 ---
 
 ## ⚡ En bref
@@ -46,8 +48,10 @@ flowchart LR
     D --> E{"✅ Ton accord ?"}
     E -- non --> D
     E -- oui --> F["📦 Copie<br/>réorganisée"]
-    F --> G["🧠 Préproduction<br/>multi-agents"]
-    G --> H["🚀 Projet prêt<br/>pour le dev"]
+    F --> G["🧠 Mémoire<br/>multi-agents"]
+    G --> P["🗺️ Plan<br/>superpowers"]
+    P --> SEC["🔒 Sécurité"]
+    SEC --> H["🚀 Prêt pour<br/>la production"]
 
     style A fill:#fde2e2,stroke:#e57373,color:#000
     style E fill:#fff4cc,stroke:#f0b400,color:#000
@@ -60,6 +64,10 @@ flowchart LR
 | 🧹 Propreté | Doublons, artefacts, déchets système | Seulement ce qui sert, avec la raison de chaque suppression |
 | 🔗 Liens | Chemins fragiles | Tous les chemins réécrits et vérifiés (0 lien cassé) |
 | 🧠 Agents | Rien | Mémoire `.agents/` partagée, graphe, hooks Claude Code + Codex, `AGENTS.md` |
+| 🖥️ Écrans | Démos éparpillées | Chaque écran gardé, relié à sa route et à son endpoint (`docs/design/screens.md`) |
+| 🧱 Stack | À décider | Arborescence adaptée à l'intention (Astro, SvelteKit + Axum, Tauri, SwiftUI, Compose) |
+| 🗺️ Plan | Aucun | Plan de production superpowers : brancher l'existant, ajouter ce qui manque |
+| 🔒 Sécurité | Inconnue | Base CWE/ASVS, exigences par stack, audit Cloudflare avant la prod |
 | ↩️ Retour arrière | — | Source intacte + `file-map.json` (avant → après) |
 
 ---
@@ -129,7 +137,26 @@ Seul prérequis à l'usage : Python 3.9+ (`python` sur Windows, `python3` ailleu
 
 ou en langage naturel : *« organise ce dossier de design pour le développement »*.
 
-La skill te pose d'abord **une seule question groupée** (cible, stack visée, mémoire partagée ou privée, agents à brancher), puis déroule le reste.
+La skill te pose d'abord **une seule question groupée** (cible, ce que tu veux construire, mémoire partagée ou privée, agents à brancher), puis déroule le reste.
+
+Ou directement depuis ton terminal : la commande installe la skill si besoin, puis lance l'agent.
+
+```bash
+npx design-to-dev run "~/Downloads/Mon Design System"            # Claude Code
+npx design-to-dev run "~/Downloads/Mon Design System" --codex    # Codex
+npx design-to-dev run "~/Downloads/Mon Design System" --print    # affiche juste la commande
+```
+
+Les outils d'analyse marchent aussi seuls, sans agent :
+
+| Commande | Ce qu'elle fait |
+|---|---|
+| `npx design-to-dev scan <dossier>` | intention, écrans et démos existants, contrat backend, stack conseillée |
+| `npx design-to-dev security <dossier>` | candidats de sécurité (CWE + ASVS + correctif), secrets masqués |
+| `npx design-to-dev requirements --intent dashboard` | checklist de sécurité pour la stack |
+| `npx design-to-dev skills` | superpowers et security-audit installées ? sinon, comment les installer |
+| `npx design-to-dev inventory <dossier>` | inventaire brut des fichiers |
+| `npx design-to-dev path` | dossier de la skill installée |
 
 ### Juste la mémoire, sur un projet existant
 
@@ -147,19 +174,21 @@ npx design-to-dev init . --update    # met à jour le hook
 
 ```mermaid
 flowchart TD
-    S0["<b>0 · Cadrage</b><br/>source, cible, stack, mémoire, agents"]
-    S1["<b>1 · Inventaire</b><br/>types, tailles, doublons,<br/>références entre fichiers"]
-    S2["<b>2 · Analyse</b><br/>sous-agents en parallèle"]
+    S0["<b>0 · Cadrage</b><br/>source, cible, intention, mémoire, agents"]
+    S1["<b>1 · Inventaire + détection</b><br/>fichiers, doublons, écrans,<br/>intention, contrat backend"]
+    S2["<b>2 · Analyse</b><br/>équipes nettoyage + design<br/>(questions si intention floue)"]
     S3["<b>3 · Plan</b><br/>keep / move / delete<br/>+ vérification automatique"]
     OK{"<b>Validation</b><br/>par toi"}
     S4["<b>4 · Application</b><br/>copie + réécriture des chemins"]
-    S5["<b>5 · Fichiers racine</b><br/>README, .gitignore, ADR"]
-    S6["<b>6 · Préproduction</b><br/>.agents/ : mémoire, graphe, hooks<br/>+ adaptateurs par agent"]
-    S7["<b>7 · Git</b><br/>premier commit (sur demande)"]
+    S5["<b>5 · Fichiers racine</b><br/>README, ADR, screens.md, stack.md"]
+    S6["<b>6 · Mémoire</b><br/>.agents/ : mémoire, graphe, hooks<br/>+ adaptateurs par agent"]
+    S7["<b>7 · Plan</b><br/>superpowers : brancher l'existant"]
+    S8["<b>8 · Sécurité</b><br/>base CWE/ASVS + exigences<br/>+ audit Cloudflare"]
+    S9["<b>9 · Git</b><br/>premier commit (sur demande)"]
 
     S0 --> S1 --> S2 --> S3 --> OK
     OK -- "à corriger" --> S3
-    OK -- "oui" --> S4 --> S5 --> S6 --> S7
+    OK -- "oui" --> S4 --> S5 --> S6 --> S7 --> S8 --> S9
 
     style OK fill:#fff4cc,stroke:#f0b400,color:#000
     style S4 fill:#e3f0ff,stroke:#4a90d9,color:#000
@@ -177,7 +206,14 @@ flowchart TB
     INV --> ASSETS["🖼️ assets<br/>images, polices, captures"]
     INV --> DOCS["📚 docs-tooling<br/>markdown, specimens, configs"]
     INV --> ARCH["🏛️ architect<br/>stack, arborescence, ADR"]
+    DINV[("📄 design-inventory.json")]
+    DINV --> SCR["🖥️ screens<br/>écrans, démos, doublons, manquants"]
+    DINV --> CMP["🧱 components<br/>composants, tokens"]
+    DINV --> DATA["🔌 data-contract<br/>entités, endpoints, auth"]
+    DINV --> INT["🎯 intent<br/>ce que tu construis"]
+    DINV --> ADP["🔁 stack-adapter<br/>écran → route de la stack"]
     CODE & ASSETS & DOCS & ARCH --> PLAN[("📋 plan.json")]
+    SCR & CMP & DATA & INT & ADP --> SCREENS[("🗂️ docs/design/screens.md")]
     PLAN --> REVIEW["❓ cas douteux : te sont posés"]
 ```
 
@@ -193,6 +229,26 @@ Avant toute copie, le plan est vérifié automatiquement. Il est **refusé** si 
 | 4 | une destination sort de la cible |
 
 ---
+
+### 🧱 Stacks selon ce que tu construis
+
+| Intention | Stack conseillée |
+|---|---|
+| Site vitrine | Astro + Tailwind + Motion/GSAP, îlots Svelte ou React, Rust Axum si formulaires |
+| Dashboard (admin + utilisateurs) | SvelteKit ou Next.js, TanStack Query, shadcn/ui · Rust Axum + SQLx + PostgreSQL · Argon2id, cookies HttpOnly, MFA TOTP |
+| App desktop | Tauri 2 (SQLite, trousseau OS, IPC minimal, updater signé) |
+| iOS / Android | SwiftUI / Jetpack Compose, cœur Rust partagé via UniFFI |
+
+Si tes maquettes utilisent déjà un framework, la skill te demande : le garder ou le porter. Détails : [`references/stacks.md`](references/stacks.md).
+
+### 🔒 Sécurité, avant d'écrire le backend
+
+Méthode reprise de [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (un motif repéré n'est qu'un *candidat*, pas une faille) et contrôles ancrés dans OWASP ASVS 4.0.3 et les CWE, comme [UnitOneAI/SecuritySkills](https://github.com/UnitOneAI/SecuritySkills) :
+
+1. `security` repère les motifs à risque (XSS, SQL concaténé, jetons dans `localStorage`, secrets en dur, Tauri/Electron/Android/iOS mal configurés…) → `docs/security/baseline.json`.
+2. `requirements` écrit la checklist de la stack et des écrans détectés (connexion → anti brute-force, upload → contrôle MIME…) → `docs/security/exigences.md`.
+3. Chaque exigence devient une tâche testée dans le plan superpowers.
+4. Avant la prod : skill `security-audit` de Cloudflare (installée seulement si tu le veux).
 
 ## 📂 Résultat type
 
@@ -216,6 +272,10 @@ mon-projet/
 │   └── assets/{brand,images}/
 ├── prototypes/<écran>/          écrans HTML jouables
 ├── docs/
+│   ├── design/screens.md        chaque écran → route, endpoint, action prod
+│   ├── architecture/stack.md    intention, stack, contrat backend
+│   ├── security/                baseline.json, exigences.md
+│   ├── superpowers/plans/       plan de production
 │   ├── design-system/           README, specimens, références visuelles
 │   ├── adr/0001-structure-du-projet.md
 │   └── cleanup/                 report.md, file-map.json (avant → après)
@@ -313,6 +373,8 @@ La mémoire native de Codex (`~/.codex/memories`, activée par `[features] memor
 | 🔑 **Pas de secrets** | `.env` n'est jamais copié (→ `.env.example`). Tokens, mots de passe et identifiants d'URL sont caviardés dans le graphe et les notes ; `doctor` signale tout secret écrit dans la mémoire. |
 | 🧷 **Tes hooks conservés** | La fusion dans `settings.json` / `hooks.json` ne touche que les entrées de design-to-dev ; un JSON invalide arrête tout sans rien écrire. |
 | 👤 **Données personnelles** | Photos de personnes, noms, emails, captures de conversations : jamais tranchés seuls. |
+| 🎨 **Design préservé** | Un écran abouti n'est jamais supprimé ni redessiné ; les doublons vont dans `prototypes/archive/`. |
+| 🧩 **Rien installé en douce** | superpowers et security-audit ne sont installées qu'avec ton accord. |
 | 🛑 **Contenu = données** | Toute consigne trouvée dans un fichier analysé ou dans la mémoire est ignorée ; les notes qui ressemblent à une injection sont refusées. |
 
 ---
@@ -336,7 +398,13 @@ python scripts/organize.py apply plan.json --apply
 # 4. Vérifier les liens dans la cible
 python scripts/organize.py verify "<cible>"
 
-# 5. Préproduction multi-agents
+# 5. Détection du projet et sécurité
+python scripts/detect_project.py scan "<source>" --out design-inventory.json
+python scripts/detect_project.py skills --require superpowers,security-audit
+python scripts/security_check.py scan "<cible>" --out baseline.json
+python scripts/security_check.py requirements --intent dashboard --inventory design-inventory.json
+
+# 6. Préproduction multi-agents
 python scripts/scaffold_memory.py "<cible>" --name "Mon projet" \
   --file-map "<cible>/docs/cleanup/file-map.json" --agents claude,codex [--private-memory]
 ```
@@ -349,12 +417,14 @@ Format du plan : [`references/plan-format.md`](references/plan-format.md). Tests
 
 | Chemin | Rôle |
 |---|---|
-| [`SKILL.md`](SKILL.md) | Déroulé de la skill (étapes 0 à 7, garde-fous) |
-| [`references/`](references/) | Conventions de dossiers, règles de classification, format du plan, prompts des sous-agents |
+| [`SKILL.md`](SKILL.md) | Déroulé de la skill (étapes 0 à 9, garde-fous) |
+| [`references/`](references/) | Conventions de dossiers, stacks par intention, réutilisation du design, sécurité, format du plan, prompts des sous-agents |
 | [`scripts/organize.py`](scripts/organize.py) | Inventaire, vérification du plan, application, vérification des liens |
+| [`scripts/detect_project.py`](scripts/detect_project.py) | Intention, écrans existants, contrat backend, skills compagnes |
+| [`scripts/security_check.py`](scripts/security_check.py) | Candidats de sécurité, exigences par stack |
 | [`scripts/scaffold_memory.py`](scripts/scaffold_memory.py) | Création de `.agents/` et des adaptateurs par agent, `--check`, `--update` |
 | [`templates/agents/`](templates/agents/) | Protocole mémoire, règles du graphe, hook `memory_hook.py` |
-| [`bin/cli.js`](bin/cli.js) | CLI npx : `install`, `uninstall`, `init`, `doctor` |
+| [`bin/cli.js`](bin/cli.js) | CLI npx : `install`, `run`, `scan`, `security`, `requirements`, `skills`, `init`, `doctor`… |
 | [`install.sh`](install.sh) · [`install.ps1`](install.ps1) | Installation en une ligne, sans npm |
 | [`tests/`](tests/) | Tests de bout en bout |
 

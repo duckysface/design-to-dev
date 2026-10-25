@@ -1,7 +1,7 @@
 {
   "name": "design-to-dev",
-  "version": "2.0.0",
-  "description": "Skill Claude Code et Codex : transforme un dossier de design en projet prêt pour le dev, avec une mémoire projet partagée entre agents.",
+  "version": "2.1.0",
+  "description": "Skill Claude Code et Codex : transforme un dossier de design en projet prêt pour la production — réutilise les écrans existants, stack selon l'intention, plan superpowers, base de sécurité et mémoire partagée entre agents.",
   "bin": {
     "design-to-dev": "bin/cli.js"
   },
@@ -17,7 +17,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node bin/cli.js --version && python tests/test_memory.py"
+    "test": "node bin/cli.js --version && python tests/test_memory.py && python tests/test_project.py"
   },
   "engines": {
     "node": ">=18"
@@ -30,7 +30,13 @@
     "design-system",
     "agent-memory",
     "cross-agent-memory",
-    "agents-md"
+    "agents-md",
+    "security",
+    "owasp-asvs",
+    "superpowers",
+    "tauri",
+    "sveltekit",
+    "axum"
   ],
   "repository": {
     "type": "git",
