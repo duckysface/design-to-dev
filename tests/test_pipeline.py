@@ -5,6 +5,7 @@
     python tests/test_pipeline.py
 """
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -24,6 +25,7 @@ SECURITY = SKILL / "scripts" / "security_check.py"
 SCAFFOLD = SKILL / "scripts" / "scaffold_memory.py"
 PREPROD = SKILL / "scripts" / "preprod_log.py"
 KIT = SKILL / "scripts" / "security_kit.py"
+TRACES = SKILL / "scripts" / "ai_traces.py"
 PY = sys.executable
 NO_PROFILE = {**os.environ, "DESIGN_TO_DEV_STACK": str(SKILL / "tests" / "profil-inexistant.json")}
 
@@ -500,6 +502,107 @@ class SecurityKitTest(Base):
         found = run([SECURITY, "foundations", self.root, "--json"], env=self.env)
         self.assertTrue(any("ref.md" in t for t in json.loads(found.stdout)["items"]["❌"]), found.stdout)
         self.assertTrue((self.root / "docs" / "security" / "kit-securite.md").is_file())
+
+
+class AITracesTest(Base):
+    # Signatures assemblées à l'exécution : ce fichier n'en contient aucune littérale.
+    GEN = "Gener" + "ated by"
+    HTML = ('<!doctype html>\n<html><head>\n  <meta name="generator" content="v0.dev">\n'
+            '  <meta name="generator" content="Hugo 0.1">\n  <!-- {gen} Claude Code (claude-opus) -->\n'
+            '  <title>A\u200bB</title>\n</head>\n<body>\n<p>Fam \U0001F468\u200d\U0001F469\u200d\U0001F467 a\u00a0: b '
+            '\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F x\U000E0041y</p>\n'
+            '<!-- keep me -->\n<a href="https://lovable.dev">Edit with Lovable</a>\n'
+            '<script src="https://cdn.gpteng.co/gptengineer.js"></script>\n</body></html>\n')
+    TSX = ("// {gen} v0\nconst url = \"https://example.com\"; // made with Copilot\nexport const A = () => (\n"
+           "  <div>\n    {{/* Created with Lovable */}}\n    <p data-lov-id=\"x\">hi</p>\n  </div>\n);\n/* keep */\n"
+           "const s = '// {gen} Claude';\nconst t = 1; /* {gen} Claude */ const u = 2;\n")
+    MD = ("# T\n\nText\n\n\U0001F916 Generated with [Claude Code](https://claude.com/claude-code)\n\n"
+          "Co-" + "Authored-By: Claude Opus <noreply@anthropic.com>\n\n```\nCo-" + "Authored-By: Claude <x@y>\n```\n")
+
+    def setUp(self):
+        super().setUp()
+        self.root = self.tmp / "proj"
+        write(self.root, "index.html", self.HTML.format(gen=self.GEN))
+        write(self.root, "app.tsx", self.TSX.format(gen=self.GEN))
+        write(self.root, "README.md", self.MD)
+        write(self.root, ".claude/x.md", f"<!-- {self.GEN} Claude -->\n")
+
+    def read(self, rel):
+        return (self.root / rel).read_text(encoding="utf-8")
+
+    def clean(self, *extra):
+        r = run([TRACES, "clean", self.root, "--json", *extra])
+        return r, json.loads(r.stdout)
+
+    def test_clean_removes_safe_traces_and_keeps_design(self):
+        r, data = self.clean()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(data["refused"], [])
+        html = self.read("index.html")
+        self.assertNotIn("v0.dev", html)
+        self.assertNotIn(self.GEN, html)
+        self.assertIn('content="Hugo 0.1"', html)
+        self.assertIn("<!-- keep me -->", html)
+        self.assertIn("<title>AB</title>", html)
+        self.assertIn("\u200d\U0001F469", html)                 # emoji composé intact
+        self.assertIn("a\u00a0:", html)                        # espace insécable intact
+        self.assertIn("\U0001F3F4\U000E0067", html)            # drapeau intact
+        self.assertIn("xy</p>", html)                          # tag isolé retiré
+        self.assertIn("Edit with Lovable", html)               # badge : seulement signalé
+        tsx = self.read("app.tsx")
+        self.assertTrue(tsx.startswith('const url = "https://example.com";\n'))
+        self.assertNotIn("Lovable", tsx)
+        self.assertIn("<div>\n    <p data-lov-id", tsx)
+        self.assertIn(f"const s = '// {self.GEN} Claude';", tsx)  # chaîne jamais touchée
+        self.assertIn("/* keep */", tsx)
+        self.assertEqual(self.read("README.md"), "# T\n\nText\n\n```\nCo-" + "Authored-By: Claude <x@y>\n```\n")
+        self.assertIn(self.GEN, self.read(".claude/x.md"))     # config d'agent ignorée
+        flagged = " ".join(i["text"] for i in data["items"])
+        for hint in ("Edit with Lovable", "cdn.gpteng.co", "data-lov-id", "app.tsx:9"):
+            self.assertIn(hint, flagged)
+        self.assertNotIn("README.md", flagged)                 # bloc de code : ni retiré ni signalé
+        report = self.read("docs/cleanup/traces-ia.md")
+        self.assertIn("## Retiré", report)
+        self.assertIn("## À vérifier", report)
+
+    def test_invisible_in_code_string_is_kept_and_flagged(self):
+        zw, bidi = chr(0x200B), chr(0x202E)
+        write(self.root, "zw.js", f'const Z = "a{zw}b";  // note{zw} ok\nconst R = /[{bidi}]/;\n')
+        r, data = self.clean()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        js = self.read("zw.js")
+        self.assertIn(f'"a{zw}b"', js)                         # chaîne : le code ne change pas
+        self.assertIn("// note ok", js)                        # commentaire : retiré
+        self.assertIn(f"/[{bidi}]/", js)
+        self.assertIn("zw.js:1", " ".join(i["text"] for i in data["items"]))
+
+    def test_dry_run_and_scan_write_nothing(self):
+        before = {p: self.read(p) for p in ("index.html", "app.tsx", "README.md")}
+        r, data = self.clean("--dry-run")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue(any(f["removed"] for f in data["files"]))
+        self.assertEqual(run([TRACES, "scan", self.root, "--strict"]).returncode, 1)
+        self.assertEqual(before, {p: self.read(p) for p in before})
+        self.assertFalse((self.root / "docs" / "cleanup").exists())
+
+    def test_failed_proof_leaves_file_untouched(self):
+        spec = importlib.util.spec_from_file_location("d2d_ai_traces_test", TRACES)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.signature = lambda text, kind, ext: text            # toute différence casse la preuve
+        before = self.read("app.tsx")
+        res = mod.process(self.root.resolve(), write=True)
+        self.assertIn("app.tsx", res["refused"])
+        self.assertEqual(self.read("app.tsx"), before)
+        self.assertIn("❌", [lv for lv, _, _ in mod.items(res)])
+
+    def test_foundations_flags_ai_traces(self):
+        r = run([SECURITY, "foundations", self.root, "--json"])
+        data = json.loads(r.stdout)
+        warn = " ".join(data["items"]["⚠️"])
+        self.assertIn("trace(s) d'IA", warn)
+        self.assertIn("U+E0041", warn)
+        self.assertEqual(warn.count("U+200B"), 1)              # pas répété par ai-trace
 
 
 if __name__ == "__main__":

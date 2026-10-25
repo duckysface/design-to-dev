@@ -50,7 +50,7 @@ DEP_FILES = {"package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.l
 
 
 def clean(text, n=110):
-    text = re.sub(r"[‪-‮⁦-⁩​-‍﻿]", "", str(text or ""))
+    text = re.sub(r"[\u202a-\u202e\u2066-\u2069\u200b-\u200d\ufeff]", "", str(text or ""))
     text = " ".join(text.replace("|", "/").replace("`", "'").split())
     return text if len(text) <= n else text[:n] + "…"
 

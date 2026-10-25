@@ -22,6 +22,7 @@ Les scripts lisent les fichiers du dossier que tu leur donnes et écrivent :
 | Ton dossier de skills | Les fichiers de la skill elle-même (`~/.claude/skills`, `~/.agents/skills`) |
 | La config de l'agent dans le projet | Hooks dans `.claude/settings.json` et `.codex/hooks.json` (seules nos entrées sont ajoutées) |
 | `.claude/skills/` du projet | Le kit de sécurité, si tu l'installes (`security-kit install`) |
+| `docs/cleanup/traces-ia.md` | Le rapport du nettoyage des traces d'IA (`ai-traces clean`), sans rien envoyer |
 
 ## Quand le réseau est utilisé
 
