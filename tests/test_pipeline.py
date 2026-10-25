@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Tests 2.3 : fondations, faux positifs de détection, profil de stack, mémoire remplie en direct (preprod_log,
+"""Tests 2.4 : fondations, audit des dépendances (serveur local simulé), faux positifs de détection, profil de stack, mémoire remplie en direct (preprod_log,
 --import-preprod, acte de naissance, --check). Stdlib uniquement.
 
     python tests/test_pipeline.py
 """
 import json
 import os
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parent.parent
@@ -243,6 +246,122 @@ class PreprodTest(Base):
         self.assertIn("Origine du projet", r.stdout + r.stderr)
         run([SCAFFOLD, target, "--update", "--python", PY])
         self.assertIn("## Origine du projet", index.read_text(encoding="utf-8"))
+
+
+class FakeAdvisories(BaseHTTPRequestHandler):
+    """OSV.dev, registre npm et endoflife.date simulés : aucun accès réseau pendant les tests."""
+    LODASH = "GHSA-jf85-cpcp-j695"
+    EVIL = "MAL-2024-1234"
+    VULNS = {
+        LODASH: {"id": LODASH, "aliases": ["CVE-2019-10744"], "summary": "Prototype pollution in lodash",
+                 "database_specific": {"severity": "HIGH", "cwe_ids": ["CWE-1321"]},
+                 "affected": [{"package": {"name": "lodash", "ecosystem": "npm"},
+                               "ranges": [{"events": [{"introduced": "0"}, {"fixed": "4.17.12"}]}],
+                               "ecosystem_specific": {"affected_functions": ["defaultsDeep"]}},
+                              {"package": {"name": "lodash", "ecosystem": "npm"},
+                               "ranges": [{"events": [{"introduced": "0"}, {"fixed": "4.17.21"}]}]}]},
+        EVIL: {"id": EVIL, "summary": "Malicious code in evil-pkg",
+               "affected": [{"package": {"name": "evil-pkg", "ecosystem": "npm"},
+                             "ranges": [{"events": [{"introduced": "0"}]}]}]},
+    }
+
+    def log_message(self, *args):
+        pass
+
+    def reply(self, code, data=None):
+        body = json.dumps(data).encode("utf-8") if data is not None else b""
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        if self.path != "/osv/v1/querybatch":
+            return self.reply(404)
+        queries = json.loads(self.rfile.read(int(self.headers["Content-Length"])))["queries"]
+        hits = {"lodash": self.LODASH, "evil-pkg": self.EVIL}
+        self.reply(200, {"results": [{"vulns": [{"id": hits[q["package"]["name"]], "modified": "2024-05-01T00:00:00Z"}]}
+                                     if q["package"]["name"] in hits else {} for q in queries]})
+
+    def do_GET(self):
+        if self.path.startswith("/osv/v1/vulns/"):
+            vuln = self.VULNS.get(self.path.rsplit("/", 1)[1])
+            return self.reply(200, vuln) if vuln else self.reply(404)
+        if self.path == "/npm/request/latest":
+            return self.reply(200, {"version": "2.88.2", "deprecated": "request has been deprecated"})
+        if self.path == "/npm/lodash/latest":
+            return self.reply(200, {"version": "4.17.21"})
+        if self.path == "/eol/php.json":
+            return self.reply(200, [{"cycle": "8.4", "eol": "2028-12-31", "latest": "8.4.5", "lts": False},
+                                    {"cycle": "7.4", "eol": "2022-11-28", "latest": "7.4.33"}])
+        self.reply(404)
+
+
+class DepsAuditTest(Base):
+    def setUp(self):
+        super().setUp()
+        self.root = self.tmp / "proj"
+        write(self.root, "package.json", json.dumps({"dependencies": {"lodash": "4.17.4", "request": "2.88.2",
+                                                                      "evil-pkg": "1.0.0"}}))
+        write(self.root, "composer.json", json.dumps({"require": {"php": ">=7.4"}}))
+        self.env = {k: v for k, v in NO_PROFILE.items() if "proxy" not in k.lower()}
+
+    def deps(self, *extra, base=None):
+        env = {**self.env, "DESIGN_TO_DEV_ADVISORY_BASE": base} if base else self.env
+        r = run([SECURITY, "deps", self.root, "--json", *extra], env=env)
+        self.assertTrue(r.stdout.strip().startswith("{"), r.stdout + r.stderr)
+        return r, json.loads(r.stdout)
+
+    def serve(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FakeAdvisories)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        return f"http://127.0.0.1:{server.server_address[1]}"
+
+    def levels(self, data, word):
+        return {i["level"] for i in data["items"] if word in i["text"]}
+
+    def test_online_flags_vulns_malware_deprecated_and_eol(self):
+        r, data = self.deps("--online", "--strict", base=self.serve())
+        self.assertTrue(data["online"], data)
+        self.assertEqual(data["vulns"], 2)
+        self.assertEqual(self.levels(data, "lodash"), {"⚠️"})
+        self.assertIn("4.17.12", " ".join(i["text"] for i in data["items"] if "lodash" in i["text"]))
+        self.assertEqual(self.levels(data, "evil-pkg"), {"❌"})
+        self.assertIn("⚠️", self.levels(data, "request"))
+        self.assertTrue(any(i["check"] == "runtime" and "php" in i["text"].lower() for i in data["items"]), data)
+        self.assertEqual(r.returncode, 1, "un paquet malveillant doit faire échouer --strict")
+        report = (self.root / "docs" / "security" / "dependances.md").read_text(encoding="utf-8")
+        for word in ("CVE-2019-10744", "defaultsDeep", "fetch natif", "2022-11-28"):
+            self.assertIn(word, report)
+
+    def test_offline_marks_unverified_but_uses_local_base(self):
+        r, data = self.deps()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse(data["online"])
+        self.assertTrue(any(i["check"] == "runtime" and "php" in i["text"].lower() for i in data["items"]), data)
+        self.assertIn("⚠️", self.levels(data, "request"))
+        report = (self.root / "docs" / "security" / "dependances.md").read_text(encoding="utf-8")
+        self.assertIn("non vérifié (hors ligne)", report)
+
+    def test_unreachable_service_does_not_crash(self):
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        r, data = self.deps("--online", base=f"http://127.0.0.1:{port}")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse(data["online"])
+        self.assertTrue(data["errors"], data)
+
+    def test_foundations_includes_deps(self):
+        r = run([SECURITY, "foundations", self.root, "--json", "--online"],
+                env={**self.env, "DESIGN_TO_DEV_ADVISORY_BASE": self.serve()})
+        data = json.loads(r.stdout)
+        self.assertEqual(data["deps"]["vulns"], 2)
+        self.assertTrue(any("evil-pkg" in t for t in data["items"]["❌"]), data["items"])
+        self.assertTrue((self.root / "docs" / "security" / "dependances.md").is_file())
 
 
 if __name__ == "__main__":

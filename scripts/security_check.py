@@ -7,7 +7,8 @@ sévérité n'est attribuée ici : seule une vérification humaine ou un audit c
 (skill security-audit) confirme une vulnérabilité.
 
   security_check.py scan <dossier> [--json] [--out findings.json]
-  security_check.py foundations <cible> [--out docs/security/fondations.md] [--strict] [--run-audits] [--json]
+  security_check.py foundations <cible> [--out docs/security/fondations.md] [--strict] [--run-audits] [--online] [--json]
+  security_check.py deps <cible> [--online] [--out docs/security/dependances.md] [--strict] [--json]
   security_check.py requirements --intent dashboard[,backend] [--inventory design-inventory.json] [--out exigences.md]
 """
 import argparse
@@ -329,7 +330,15 @@ def main():
     f.add_argument("--out")
     f.add_argument("--strict", action="store_true", help="code 1 s'il reste un ❌")
     f.add_argument("--run-audits", action="store_true", help="lancer npm/cargo audit, osv-scanner (accord utilisateur)")
+    f.add_argument("--online", action="store_true",
+                   help="vérifier failles, versions stables et support en ligne (OSV.dev, registres, endoflife.date)")
     f.add_argument("--json", action="store_true")
+    d = sub.add_parser("deps", help="failles connues, versions stables et support des dépendances → dependances.md")
+    d.add_argument("folder")
+    d.add_argument("--out")
+    d.add_argument("--online", action="store_true", help="envoie seulement des noms et versions de paquets publics")
+    d.add_argument("--strict", action="store_true", help="code 1 s'il reste un ❌")
+    d.add_argument("--json", action="store_true")
     b = sub.add_parser("requirements")
     b.add_argument("--intent", required=True)
     b.add_argument("--inventory")
@@ -339,7 +348,9 @@ def main():
         return scan(args.folder, args.json, args.out)
     if args.cmd == "foundations":
         return load_foundations().run(args.folder, args.out, args.strict, args.run_audits, args.json, collect,
-                                      skill_version())
+                                      skill_version(), args.online)
+    if args.cmd == "deps":
+        return load_foundations().run_deps(args.folder, args.out, args.online, args.json, args.strict, skill_version())
     return requirements(args.intent, args.inventory, args.out)
 
 

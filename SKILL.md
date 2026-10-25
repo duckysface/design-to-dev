@@ -152,12 +152,14 @@ Créer dans la cible (s'ils n'existent pas) :
 Lire `references/security.md`.
 
 ```bash
-python "$SKILL/scripts/security_check.py" foundations "<cible>"            # → docs/security/fondations.md
+python "$SKILL/scripts/security_check.py" foundations "<cible>" [--online] # → docs/security/fondations.md + dependances.md
+python "$SKILL/scripts/security_check.py" deps "<cible>" [--online]        # dépendances seules → docs/security/dependances.md
 python "$SKILL/scripts/security_check.py" scan "<cible>" --out "<cible>/docs/security/baseline.json"
 python "$SKILL/scripts/security_check.py" requirements --intent <intention[,backend]> --inventory "<scratchpad>/design-inventory.json" --out "<cible>/docs/security/exigences.md"
 ```
 
 - `foundations` : la base est-elle saine ? ✅ / ⚠️ / ❌ pour les bibliothèques CDN ou copiées anciennes, les dépendances et leurs scripts d'installation, le code caché ou obfusqué, les fichiers étrangers (`.php`, `.exe`…), les caractères Unicode invisibles (Trojan Source), les consignes cachées pour IA, les secrets et les motifs à ne pas reproduire au portage. Met à jour la ligne Fondations de l'acte de naissance et « Base vérifiée le … » dans `etat.md`. `--run-audits` lance `npm audit` / `cargo audit` / `osv-scanner` s'ils sont installés (demander avant : accès réseau), sinon ils sont listés à lancer ; `--strict` sort en erreur s'il reste un ❌. Chaque ❌ → `problemes.md` ; **aucune tâche backend tant qu'un ❌ est ouvert**.
+- `deps` (aussi lancé par `foundations`) : inventaire de **tout** ce que le projet utilise — paquets npm / PyPI / crates / Composer / Go / RubyGems / pub (manifestes et lockfiles), bibliothèques CDN, runtimes (PHP, Node, Python, Ruby, Go via `composer.json`, `engines`, `.nvmrc`, `Dockerfile`…), frameworks et API externes appelées dans le code. **Demander l'accord de l'utilisateur avant `--online`** (seuls des noms et versions de paquets publics sont envoyés à OSV.dev, aux registres et à endoflife.date). En ligne : failles connues par version (CVE, gravité, **ce qu'elles touchent** — fonctions, CWE — et **version corrigée**), dernière version stable, historique des failles, dépréciations, fin de support. Une faille **sans correctif** ou un paquet malveillant → ❌ : choisir l'alternative proposée ou isoler la partie touchée. Ensuite, pour chaque ligne de la section « À vérifier sur le web » de `dependances.md`, **chercher sur le web** (avis de sécurité officiels, changelog, historique — ex. failles PHP passées) et noter la conclusion dans `.agents/memory/decisions.md`. Hors ligne, tout est marqué « non vérifié » : ne jamais conclure qu'une dépendance est saine sans `--online` ou recherche web.
 - `scan` : candidats seulement (`candidate` / `needs_validation`, CWE + ASVS + correctif minimal), jamais de sévérité. Trier chaque entrée (faux positif / à corriger / maquette seulement) dans `docs/security/baseline.md`. Secrets toujours masqués.
 - `requirements` : checklist par stack + exigences déduites des écrans + endpoints à protéger, à intégrer au plan.
 

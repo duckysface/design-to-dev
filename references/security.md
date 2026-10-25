@@ -25,6 +25,17 @@ python "$SKILL/scripts/security_check.py" foundations "<cible>" [--strict] [--ru
 ```
 Écrit `docs/security/fondations.md` : un tableau ✅ / ⚠️ / ❌ par contrôle, avec le fichier, la raison et l'action.
 
+**Dépendances, runtimes et API** (`deps`, aussi lancé par `foundations`) → `docs/security/dependances.md` :
+
+| Contrôle | ❌ quand | ⚠️ quand |
+|---|---|---|
+| Failles connues (OSV.dev, `--online`) | paquet malveillant (`MAL-…`), faille CRITICAL, faille **sans correctif publié** | toute autre faille connue → version corrigée minimale indiquée |
+| Paquets dépréciés ou compromis | — | abandonné, déprécié par son registre, saboté (`colors`, `event-stream`…) → alternative proposée |
+| Runtimes et frameworks (endoflife.date, `--online`) | — | branche sans correctifs de sécurité (PHP 7.4, Node 16, Laravel 8…) → version maintenue conseillée (LTS d'abord) |
+| API externes | — | listées pour vérification (avis de sécurité du fournisseur, clés côté serveur) |
+
+Sans `--online`, seuls la base locale (runtimes minimaux, alternatives) et l'inventaire sont utilisés ; le reste est marqué « non vérifié ». L'agent complète par une recherche web sur chaque ligne « À vérifier sur le web » (avis officiels, changelog, historique des failles) et note la conclusion dans `decisions.md`. Une faille sans correctif ne s'ignore jamais : alternative, ou isolation de la fonction touchée (désactiver, encapsuler, valider les entrées en amont).
+
 | Contrôle | ❌ quand | ⚠️ quand |
 |---|---|---|
 | Bibliothèques CDN ou copiées (`references/vulnerable-libs.json`) | — | version en fin de vie ou avec CVE connue (jQuery < 3.5, AngularJS 1.x, Lodash < 4.17.21…) → remplacer au portage |
@@ -38,6 +49,7 @@ python "$SKILL/scripts/security_check.py" foundations "<cible>" [--strict] [--ru
 | Ne pas reproduire au portage | — | listé à part : `innerHTML`, jetons dans `localStorage`, CORS `*`… vus dans la maquette |
 
 Règles :
+- `--online` interroge OSV.dev, les registres de paquets et endoflife.date (noms et versions de paquets publics seulement) : demander d'abord.
 - `--run-audits` lance `npm audit` / `cargo audit` / `osv-scanner` s'ils sont installés (accès réseau : demander d'abord) ; sinon ils sont listés `needs_validation`, jamais installés en douce.
 - `--strict` sort en code 1 s'il reste un ❌ (utilisable en CI).
 - Chaque ❌ va dans `.agents/memory/problemes.md` et devient la **phase 0** du plan ; aucune tâche backend tant qu'un ❌ est ouvert.

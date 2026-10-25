@@ -1,19 +1,302 @@
 {
   "updated": "2026-10-25",
-  "note": "Versions minimales sûres des bibliothèques souvent copiées depuis un CDN dans les maquettes. Hors ligne : à rafraîchir à chaque version de design-to-dev. Une version absente de cette liste n'est pas « sûre » : vérifier avec npm audit / osv-scanner.",
+  "note": "Versions minimales sûres des bibliothèques souvent copiées depuis un CDN dans les maquettes. Hors ligne : à rafraîchir à chaque version de design-to-dev. Une version absente de cette liste n'est pas « sûre » : vérifier avec npm audit / osv-scanner. « runtimes » et « alternatives » servent hors ligne ; `--online` interroge OSV.dev et endoflife.date pour une réponse à jour.",
   "libs": [
-    {"name": "jquery", "aliases": ["jquery.min", "jquery.slim"], "min_safe": "3.5.0", "cve": ["CVE-2020-11022", "CVE-2020-11023"], "why": "XSS via htmlPrefilter (.html(), .append())", "replace": "jquery@latest via le gestionnaire de paquets, ou retirer jQuery au portage"},
-    {"name": "bootstrap", "aliases": ["twitter-bootstrap"], "min_safe": "4.3.1", "eol_below": "4.0.0", "cve": ["CVE-2019-8331", "CVE-2018-14042"], "why": "XSS dans tooltip/popover (data-template) ; 3.x en fin de vie", "replace": "bootstrap@5 via le gestionnaire de paquets"},
-    {"name": "lodash", "aliases": ["lodash.min"], "min_safe": "4.17.21", "cve": ["CVE-2021-23337", "CVE-2020-8203"], "why": "injection de commande (template), pollution de prototype", "replace": "lodash@latest ou fonctions natives"},
-    {"name": "angularjs", "aliases": ["angular.js", "angular.min", "angular"], "min_safe": null, "eol": true, "match_major": "1", "cve": ["CVE-2022-25869", "CVE-2023-26116"], "why": "AngularJS 1.x en fin de vie depuis 2022 (XSS, ReDoS non corrigés)", "replace": "porter vers la stack retenue (pas de reprise d'AngularJS)"},
-    {"name": "moment", "aliases": ["moment.min", "moment.js"], "min_safe": "2.29.4", "deprecated": true, "cve": ["CVE-2022-31129", "CVE-2022-24785"], "why": "ReDoS et traversée de chemin ; projet en maintenance seule", "replace": "date-fns, Day.js ou Temporal"},
-    {"name": "handlebars", "aliases": ["handlebars.min"], "min_safe": "4.7.7", "cve": ["CVE-2021-23369", "CVE-2021-23383"], "why": "exécution de code via templates", "replace": "handlebars@latest ou le moteur de la stack"},
-    {"name": "jquery-ui", "aliases": ["jqueryui", "jquery-ui.min"], "min_safe": "1.13.2", "cve": ["CVE-2022-31160", "CVE-2021-41184"], "why": "XSS (checkboxradio, position)", "replace": "composants natifs ou de la stack"},
-    {"name": "underscore", "aliases": ["underscore.js", "underscore-min"], "min_safe": "1.12.1", "cve": ["CVE-2021-23358"], "why": "injection via _.template", "replace": "underscore@latest ou fonctions natives"},
-    {"name": "chart.js", "aliases": ["chartjs", "chart", "chart.min"], "min_safe": "2.9.4", "cve": ["CVE-2020-7746"], "why": "pollution de prototype (options)", "replace": "chart.js@4 via le gestionnaire de paquets"},
-    {"name": "axios", "aliases": ["axios.min"], "min_safe": "1.6.0", "cve": ["CVE-2023-45857", "CVE-2024-39338"], "why": "fuite du jeton XSRF, SSRF", "replace": "axios@latest ou fetch natif"},
-    {"name": "dompurify", "aliases": ["purify", "purify.min"], "min_safe": "3.1.3", "cve": ["CVE-2024-45801", "CVE-2024-47875"], "why": "contournement de l'assainissement", "replace": "dompurify@latest"},
-    {"name": "highlight.js", "aliases": ["highlightjs", "highlight.min"], "min_safe": "10.4.1", "cve": ["CVE-2020-26237"], "why": "ReDoS / pollution de prototype", "replace": "highlight.js@latest ou shiki"},
-    {"name": "marked", "aliases": ["marked.min"], "min_safe": "4.0.10", "cve": ["CVE-2022-21680", "CVE-2022-21681"], "why": "ReDoS", "replace": "marked@latest + DOMPurify"}
-  ]
+    {
+      "name": "jquery",
+      "aliases": [
+        "jquery.min",
+        "jquery.slim"
+      ],
+      "min_safe": "3.5.0",
+      "cve": [
+        "CVE-2020-11022",
+        "CVE-2020-11023"
+      ],
+      "why": "XSS via htmlPrefilter (.html(), .append())",
+      "replace": "jquery@latest via le gestionnaire de paquets, ou retirer jQuery au portage"
+    },
+    {
+      "name": "bootstrap",
+      "aliases": [
+        "twitter-bootstrap"
+      ],
+      "min_safe": "4.3.1",
+      "eol_below": "4.0.0",
+      "cve": [
+        "CVE-2019-8331",
+        "CVE-2018-14042"
+      ],
+      "why": "XSS dans tooltip/popover (data-template) ; 3.x en fin de vie",
+      "replace": "bootstrap@5 via le gestionnaire de paquets"
+    },
+    {
+      "name": "lodash",
+      "aliases": [
+        "lodash.min"
+      ],
+      "min_safe": "4.17.21",
+      "cve": [
+        "CVE-2021-23337",
+        "CVE-2020-8203"
+      ],
+      "why": "injection de commande (template), pollution de prototype",
+      "replace": "lodash@latest ou fonctions natives"
+    },
+    {
+      "name": "angularjs",
+      "aliases": [
+        "angular.js",
+        "angular.min",
+        "angular"
+      ],
+      "min_safe": null,
+      "eol": true,
+      "match_major": "1",
+      "cve": [
+        "CVE-2022-25869",
+        "CVE-2023-26116"
+      ],
+      "why": "AngularJS 1.x en fin de vie depuis 2022 (XSS, ReDoS non corrigés)",
+      "replace": "porter vers la stack retenue (pas de reprise d'AngularJS)"
+    },
+    {
+      "name": "moment",
+      "aliases": [
+        "moment.min",
+        "moment.js"
+      ],
+      "min_safe": "2.29.4",
+      "deprecated": true,
+      "cve": [
+        "CVE-2022-31129",
+        "CVE-2022-24785"
+      ],
+      "why": "ReDoS et traversée de chemin ; projet en maintenance seule",
+      "replace": "date-fns, Day.js ou Temporal"
+    },
+    {
+      "name": "handlebars",
+      "aliases": [
+        "handlebars.min"
+      ],
+      "min_safe": "4.7.7",
+      "cve": [
+        "CVE-2021-23369",
+        "CVE-2021-23383"
+      ],
+      "why": "exécution de code via templates",
+      "replace": "handlebars@latest ou le moteur de la stack"
+    },
+    {
+      "name": "jquery-ui",
+      "aliases": [
+        "jqueryui",
+        "jquery-ui.min"
+      ],
+      "min_safe": "1.13.2",
+      "cve": [
+        "CVE-2022-31160",
+        "CVE-2021-41184"
+      ],
+      "why": "XSS (checkboxradio, position)",
+      "replace": "composants natifs ou de la stack"
+    },
+    {
+      "name": "underscore",
+      "aliases": [
+        "underscore.js",
+        "underscore-min"
+      ],
+      "min_safe": "1.12.1",
+      "cve": [
+        "CVE-2021-23358"
+      ],
+      "why": "injection via _.template",
+      "replace": "underscore@latest ou fonctions natives"
+    },
+    {
+      "name": "chart.js",
+      "aliases": [
+        "chartjs",
+        "chart",
+        "chart.min"
+      ],
+      "min_safe": "2.9.4",
+      "cve": [
+        "CVE-2020-7746"
+      ],
+      "why": "pollution de prototype (options)",
+      "replace": "chart.js@4 via le gestionnaire de paquets"
+    },
+    {
+      "name": "axios",
+      "aliases": [
+        "axios.min"
+      ],
+      "min_safe": "1.6.0",
+      "cve": [
+        "CVE-2023-45857",
+        "CVE-2024-39338"
+      ],
+      "why": "fuite du jeton XSRF, SSRF",
+      "replace": "axios@latest ou fetch natif"
+    },
+    {
+      "name": "dompurify",
+      "aliases": [
+        "purify",
+        "purify.min"
+      ],
+      "min_safe": "3.1.3",
+      "cve": [
+        "CVE-2024-45801",
+        "CVE-2024-47875"
+      ],
+      "why": "contournement de l'assainissement",
+      "replace": "dompurify@latest"
+    },
+    {
+      "name": "highlight.js",
+      "aliases": [
+        "highlightjs",
+        "highlight.min"
+      ],
+      "min_safe": "10.4.1",
+      "cve": [
+        "CVE-2020-26237"
+      ],
+      "why": "ReDoS / pollution de prototype",
+      "replace": "highlight.js@latest ou shiki"
+    },
+    {
+      "name": "marked",
+      "aliases": [
+        "marked.min"
+      ],
+      "min_safe": "4.0.10",
+      "cve": [
+        "CVE-2022-21680",
+        "CVE-2022-21681"
+      ],
+      "why": "ReDoS",
+      "replace": "marked@latest + DOMPurify"
+    }
+  ],
+  "runtimes": {
+    "php": {
+      "min_supported": "8.2",
+      "checked": "2026-10-25",
+      "notable": [
+        "CVE-2024-4577 (PHP-CGI sous Windows, injection d'arguments ; corrigé en 8.1.29, 8.2.20, 8.3.8)",
+        "CVE-2019-11043 (PHP-FPM + nginx, exécution de code)"
+      ]
+    },
+    "nodejs": {
+      "min_supported": "22",
+      "checked": "2026-10-25",
+      "notable": [
+        "CVE-2024-27980 (injection de commande via child_process sous Windows)"
+      ]
+    },
+    "python": {
+      "min_supported": "3.10",
+      "checked": "2026-10-25",
+      "notable": [
+        "CVE-2007-4559 (tarfile, écriture hors dossier ; filtre par défaut depuis 3.14)"
+      ]
+    },
+    "ruby": {
+      "min_supported": "3.3",
+      "checked": "2026-10-25",
+      "notable": []
+    },
+    "go": {
+      "min_supported": "1.25",
+      "checked": "2026-10-25",
+      "notable": []
+    }
+  },
+  "alternatives": {
+    "npm:request": {
+      "why": "abandonné depuis 2020, plus de correctifs",
+      "replace": "fetch natif ou undici"
+    },
+    "npm:request-promise": {
+      "why": "abandonné avec request",
+      "replace": "fetch natif ou undici"
+    },
+    "npm:moment": {
+      "why": "projet en maintenance, déconseillé par ses auteurs",
+      "replace": "date-fns, dayjs ou Temporal"
+    },
+    "npm:node-sass": {
+      "why": "déprécié (LibSass arrêté)",
+      "replace": "sass (Dart Sass)"
+    },
+    "npm:tslint": {
+      "why": "déprécié depuis 2019",
+      "replace": "eslint + typescript-eslint"
+    },
+    "npm:crypto-js": {
+      "why": "plus maintenu (2023), PBKDF2 faible par défaut avant 4.2.0",
+      "replace": "Web Crypto (crypto.subtle) ou node:crypto"
+    },
+    "npm:colors": {
+      "why": "sabotée par son auteur en 2022 (1.4.1+)",
+      "replace": "picocolors ou chalk"
+    },
+    "npm:faker": {
+      "why": "sabotée par son auteur en 2022",
+      "replace": "@faker-js/faker"
+    },
+    "npm:event-stream": {
+      "why": "compromise en 2018 (flatmap-stream, vol de portefeuilles)",
+      "replace": "streams natifs de Node.js"
+    },
+    "npm:node-ipc": {
+      "why": "sabotage volontaire en 2022 (protestware, 10.1.1–10.1.2)",
+      "replace": "@node-ipc/compat ou IPC natif"
+    },
+    "npm:left-pad": {
+      "why": "inutile depuis String.prototype.padStart",
+      "replace": "padStart natif"
+    },
+    "npm:querystring": {
+      "why": "API héritée",
+      "replace": "URLSearchParams"
+    },
+    "npm:uuid-v4": {
+      "why": "abandonné",
+      "replace": "crypto.randomUUID()"
+    },
+    "npm:bcrypt-nodejs": {
+      "why": "abandonné",
+      "replace": "bcrypt ou argon2"
+    },
+    "npm:serialize-to-js": {
+      "why": "désérialisation dangereuse",
+      "replace": "JSON.stringify / structuredClone"
+    },
+    "PyPI:pycrypto": {
+      "why": "abandonné depuis 2013, failles non corrigées (CVE-2013-7459)",
+      "replace": "pycryptodome ou cryptography"
+    },
+    "PyPI:python-jose": {
+      "why": "maintenance faible, failles JWT (CVE-2024-33663)",
+      "replace": "PyJWT ou joserfc"
+    },
+    "PyPI:nose": {
+      "why": "abandonné",
+      "replace": "pytest"
+    },
+    "Packagist:swiftmailer/swiftmailer": {
+      "why": "abandonné",
+      "replace": "symfony/mailer"
+    },
+    "RubyGems:paperclip": {
+      "why": "déprécié",
+      "replace": "Active Storage"
+    }
+  }
 }

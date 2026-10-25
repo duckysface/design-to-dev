@@ -33,6 +33,10 @@ design-to-dev **n'inclut aucun code de tiers**. Les projets ci-dessous sont cit�
 - **CWE™** — marque de The MITRE Corporation. Seuls les identifiants sont cités (ex. `CWE-79`).
 - **CVE®** — marque de The MITRE Corporation. Les identifiants listés dans [`references/vulnerable-libs.json`](references/vulnerable-libs.json) proviennent des avis publics.
 
+## Sources de données consultées en ligne
+
+Avec `--online` seulement : [OSV.dev](https://osv.dev) (données d'avis sous licences de leurs sources, majoritairement CC-BY 4.0), [endoflife.date](https://endoflife.date) (MIT) et les API publiques des registres de paquets. Rien de ces sources n'est inclus dans design-to-dev ; les rapports citent les identifiants et les liens.
+
 ## Marques
 
 Claude, Claude Code et Claude Design sont des marques d'Anthropic. Codex est une marque d'OpenAI. Figma, v0, Lovable, Bolt, Cursor, Gemini, GitHub Copilot, Supabase, Cloudflare et les frameworks cités appartiennent à leurs propriétaires respectifs. design-to-dev est un projet indépendant, **sans lien ni approbation** de ces sociétés ; leurs noms servent seulement à indiquer la compatibilité.

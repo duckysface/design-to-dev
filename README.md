@@ -249,6 +249,7 @@ La sécurité passe **avant** le plan : un plan bâti sur une base douteuse hér
 
 ```bash
 npx design-to-dev foundations ./mon-projet --strict
+npx design-to-dev deps ./mon-projet --online     # failles connues, versions stables, fin de support
 ```
 
 | Contrôle | Exemples |
@@ -260,6 +261,8 @@ npx design-to-dev foundations ./mon-projet --strict
 | Caractères invisibles | Unicode bidirectionnel (Trojan Source) |
 | Consignes cachées pour IA | texte qui tente de piloter un agent |
 | Secrets | clés en dur, vrai `.env` |
+| Dépendances (`--online`) | failles connues et ce qu'elles touchent, version corrigée, dernière version stable, historique, paquets abandonnés ou malveillants |
+| Runtimes et frameworks | PHP, Node, Python, Laravel… en fin de support, version maintenue conseillée |
 
 Chaque point est classé ✅ / ⚠️ / ❌ dans `docs/security/fondations.md`. Aucune tâche backend ne commence tant qu'un ❌ reste ouvert. Ensuite, `security` repère les motifs à risque (XSS, SQL concaténé, jetons dans `localStorage`…) et `requirements` écrit la checklist de ta stack.
 

@@ -29,6 +29,7 @@ design-to-dev ne contacte aucun serveur de lui-même. Le réseau sert seulement 
 | Action | Contacte |
 |---|---|
 | Installation (`npx`, `install.sh`, `install.ps1`, `git clone`) | npm et GitHub |
+| `deps --online`, `foundations --online` | [OSV.dev](https://osv.dev), les registres (npm, PyPI, crates.io, Packagist, proxy Go, RubyGems, pub.dev) et [endoflife.date](https://endoflife.date) : **seuls des noms et versions de paquets publics** sont envoyés, jamais ton code ni tes fichiers |
 | `foundations --run-audits` | Les registres de `npm audit`, `cargo audit` ou `osv-scanner`, s'ils sont installés |
 | Installation d'une skill compagnon (superpowers, security-audit) | GitHub, **uniquement avec ton accord** |
 
