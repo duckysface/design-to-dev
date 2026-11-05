@@ -1,425 +1,312 @@
-<div align="center">
-
 # design-to-dev
 
-**Transforme un export de design en projet prêt à coder, avec une mémoire partagée par tous tes agents.**
+**Turn a design export into a coding-ready project — with a shared memory every agent can pick up.**
 
-Claude Design · Figma · v0 · Lovable · Bolt → projet rangé, sécurisé, planifié
+Works on exports from Claude Design, Figma, v0, Lovable, Bolt, or a hand-made folder of mockups.
+Skill for **Claude Code** and **Codex** · the memory is also read by Cursor, Gemini CLI and Copilot · Windows, macOS, Linux
 
-[![npm](https://img.shields.io/npm/v/design-to-dev?color=cb3837)](https://www.npmjs.com/package/design-to-dev)
-![Licence MIT](https://img.shields.io/badge/licence-MIT-green)
-![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)
-![Aucune dépendance](https://img.shields.io/badge/d%C3%A9pendances-aucune-brightgreen)
+[![npm](https://img.shields.io/npm/v/design-to-dev)](https://www.npmjs.com/package/design-to-dev)
+[![CI](https://github.com/duckysface/design-to-dev/actions/workflows/ci.yml/badge.svg)](https://github.com/duckysface/design-to-dev/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org)
+[![Node 18+](https://img.shields.io/badge/node-18%2B-blue)](https://nodejs.org)
 
-Skill pour **Claude Code** et **Codex** · mémoire lue aussi par Cursor, Gemini CLI et Copilot · Windows, macOS, Linux
-
-</div>
-
----
-
-## Sommaire
-
-1. [Ce que ça fait](#ce-que-ça-fait)
-2. [Démarrage rapide](#démarrage-rapide)
-3. [Comment ça marche](#comment-ça-marche)
-4. [Ce que tu obtiens](#ce-que-tu-obtiens)
-5. [La mémoire partagée](#la-mémoire-partagée)
-6. [Sécurité](#sécurité)
-7. [Garde-fous](#garde-fous)
-8. [Confidentialité et licence](#confidentialité-et-licence)
-9. [Référence des commandes](#référence-des-commandes)
+[Français](README.fr.md) · [Full command reference](docs/commands.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 ---
 
-## Ce que ça fait
+## What it does
 
-Un export de design ressemble souvent à ça :
+A design export usually looks like this:
 
 ```
-Mon Design System/
-├── uploads/pasted-1792877667710-0.png      ← capture collée, utilisée ?
-├── Button (copy).jsx                        ← doublon
-├── bundle.8f3a2c.js                         ← fichier généré
-├── .DS_Store  Thumbs.db                     ← déchets système
-├── colors_tokens.css   tokens-old.css       ← lequel est le bon ?
+My Design System/
+├── uploads/pasted-1792877667710-0.png      ← pasted capture, still used?
+├── Button (copy).jsx                        ← duplicate
+├── bundle.8f3a2c.js                         ← generated file
+├── .DS_Store  Thumbs.db                     ← OS junk
+├── colors_tokens.css   tokens-old.css       ← which one is right?
 └── screen 1.html  screen-1-final.html
 ```
 
-design-to-dev en fait un vrai projet, en quatre temps :
+design-to-dev turns it into a real project, in four moves:
 
-1. **Ranger** : trie les fichiers, propose une arborescence propre, **attend ton accord**, puis construit une copie avec tous les chemins corrigés. Ton dossier d'origine n'est jamais modifié.
-2. **Garder ton travail** : chaque écran déjà fait est conservé et relié à sa future route et à son endpoint, au lieu d'être refait.
-3. **Sécuriser la base** : vérifie qu'il n'y a ni bibliothèque vulnérable, ni code caché, ni secret avant d'écrire la moindre ligne de backend.
-4. **Préparer les agents** : installe une mémoire `.agents/` que Claude Code, Codex et les autres lisent et tiennent à jour. Le prochain agent sait exactement où reprendre.
+1. **Tidy up**: sorts files, proposes a clean tree, **waits for your approval**, then builds a copy with every path rewritten. Your original folder is never modified.
+2. **Keep your work**: every screen you already made is preserved and mapped to its future route and endpoint — not rebuilt from scratch.
+3. **Secure the base**: checks for vulnerable libraries, hidden code and secrets before a single line of backend is written.
+4. **Prepare the agents**: installs a `.agents/` memory that Claude Code, Codex and the others read and keep up to date. The next agent knows exactly where to resume.
 
-| | Avant | Après |
+| | Before | After |
 |---|---|---|
-| Organisation | Fichiers en vrac | `src/`, `docs/`, `prototypes/`, conventions claires |
-| Liens | Chemins fragiles | Tous réécrits et vérifiés |
-| Écrans | Démos éparpillées | Chaque écran → route + endpoint (`docs/design/screens.md`) |
-| Stack | À décider | Choisie selon ce que tu construis |
-| Sécurité | Inconnue | Fondations ✅ / ⚠️ / ❌ et exigences par stack |
-| Agents | Rien | Mémoire partagée, hooks, `AGENTS.md` |
-| Retour arrière | — | Source intacte + `file-map.json` (avant → après) |
+| Organization | Loose files | `src/`, `docs/`, `prototypes/`, clear conventions |
+| Links | Fragile paths | All rewritten and verified |
+| Duplicates | Silent copies | Analyzed, merged safely (references rewritten) or flagged for review |
+| Screens | Scattered demos | Each screen → route + endpoint (`docs/design/screens.md`) |
+| Stack | Undecided | Chosen from what you're building |
+| Security | Unknown | Foundations ✅ / ⚠️ / ❌ and per-stack requirements |
+| AI traces | Watermarks, badges, trackers | Auto-removed with a written proof the design is unchanged |
+| Agents | Nothing | Shared memory, hooks, `AGENTS.md` |
+| Rollback | — | Source untouched + `file-map.json` (before → after) |
 
-Ton dossier est **déjà un projet commencé** (`package.json`, `src/`…) ? La skill le détecte, garde ta structure, retire seulement les déchets et ajoute ce qui manque.
+Already a started project (`package.json`, `src/`…)? The skill detects it, keeps your structure, removes only the junk and adds what's missing.
 
----
+## Quick start
 
-## Démarrage rapide
+### 1. Install
 
-### 1. Installer
-
-```bash
+```sh
 npx design-to-dev
 ```
 
-Un menu te demande où installer : Claude Code, Codex, ou les deux. Seul prérequis : **Python 3.9+**.
+A menu asks where to install: Claude Code, Codex, or both. Requirements: **Node 18+** (for the CLI) and **Python 3.9+** (stdlib only, no pip dependencies).
 
 <details>
-<summary>Autres méthodes d'installation</summary>
+<summary>Other install methods</summary>
 
-**Sans question :**
+**Non-interactive:**
 
-```bash
+```sh
 npx design-to-dev install --claude -y
 ```
 
-| Option | Installe dans |
+| Option | Installs into |
 |---|---|
 | `--claude` | `~/.claude/skills/design-to-dev` |
 | `--codex` | `~/.agents/skills/design-to-dev` |
-| `--all` | les deux |
-| `--project [dossier]` | dans le projet au lieu de ton dossier utilisateur |
+| `--all` | both |
+| `--project [dir]` | into the project instead of your home folder |
 
-**Sans Node, macOS / Linux :**
+**Without Node, macOS / Linux** — download, read, then run (never pipe a script you haven't inspected):
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/duckysface/design-to-dev/main/install.sh | sh
+```sh
+curl -fsSLO https://raw.githubusercontent.com/duckysface/design-to-dev/main/install.sh
+less install.sh        # read it first
+sh install.sh          # then run it ; add -- --codex (or --claude, --all) to pick an agent
 ```
 
-Pour un agent précis : `… | sh -s -- --codex` (ou `--claude`, `--all`).
-
-**Sans Node, Windows (PowerShell) :**
+**Without Node, Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/duckysface/design-to-dev/main/install.ps1 | iex
+Invoke-WebRequest https://raw.githubusercontent.com/duckysface/design-to-dev/main/install.ps1 -OutFile install.ps1
+Get-Content install.ps1          # read it first
+.\install.ps1                    # then run it ; set $env:DESIGN_TO_DEV_AGENTS = "codex" to pick an agent
 ```
 
-Pour un agent précis : `$env:DESIGN_TO_DEV_AGENTS = "codex"` avant la commande.
+> Why the extra step? design-to-dev pins and hash-checks every third-party file it installs — the install scripts get the same discipline: read them, then run them. The most auditable method remains `git clone` (below).
 
-**À la main :**
+**Manually (most auditable):**
 
-```bash
+```sh
 git clone https://github.com/duckysface/design-to-dev ~/.claude/skills/design-to-dev   # Claude Code
 git clone https://github.com/duckysface/design-to-dev ~/.agents/skills/design-to-dev   # Codex
 ```
 
-**Entretien :** `npx design-to-dev doctor` pour vérifier, relancer l'installation pour mettre à jour, `npx design-to-dev uninstall --all` pour désinstaller.
+**Maintenance:** `npx design-to-dev doctor` to check, re-run the install to update, `npx design-to-dev uninstall --all` to remove.
 
-</details>
+### 2. Run it on a design folder
 
-### 2. Lancer sur un dossier de design
-
-| Agent | Commande |
+| Agent | Command |
 |---|---|
-| Claude Code | `/design-to-dev ~/Downloads/Mon Design System` |
-| Codex | `$design-to-dev ~/Downloads/Mon Design System` |
+| Claude Code | `/design-to-dev ~/Downloads/My Design System` |
+| Codex | `$design-to-dev ~/Downloads/My Design System` |
 
-Tu peux aussi le demander en langage naturel (*« organise ce dossier de design pour le développement »*) ou passer par le terminal :
+You can also ask in natural language (*"organize this design folder for development"*) or use the terminal:
 
-```bash
-npx design-to-dev run "~/Downloads/Mon Design System"           # Claude Code
-npx design-to-dev run "~/Downloads/Mon Design System" --codex   # Codex
+```sh
+npx design-to-dev run "~/Downloads/My Design System"           # Claude Code
+npx design-to-dev run "~/Downloads/My Design System" --codex   # Codex
 ```
 
-La skill pose **une seule question groupée** au début (dossier cible, ce que tu construis, mode, agents), puis déroule le reste.
+The skill asks **one grouped question** up front (target folder, what you're building, mode, agents), then runs the rest.
 
-### Ou : juste la mémoire, sur un projet existant
+### Or: just the memory, on an existing project
 
-```bash
+```sh
 npx design-to-dev init .
 ```
 
-En quelques secondes, sans toucher à ton code : mémoire `.agents/`, hooks Claude Code et Codex, `AGENTS.md`, et un `etat.md` déjà rempli avec les commandes du projet et la **prochaine étape exacte**. Plus d'options dans la [référence](#référence-des-commandes).
+In a few seconds, without touching your code: `.agents/` memory, Claude Code and Codex hooks, `AGENTS.md`, and an `etat.md` already filled with the project's commands and the **exact next step**. More options in the [command reference](docs/commands.md).
 
----
+## How it works
 
-## Comment ça marche
-
-```mermaid
-flowchart LR
-    A[Dossier de design] --> B[Inventaire et analyse]
-    B --> C{Ton accord}
-    C --> D[Copie rangée + mémoire]
-    D --> E[Fondations et sécurité]
-    E --> F[Projet prêt à coder]
-```
-
-| Étape | Ce qui se passe |
+| Step | What happens |
 |---|---|
-| **0 · Cadrage** | Source, cible, mode, stack, agents à brancher |
-| **1 · Inventaire** | Fichiers, écrans, intention ; projet neuf ou déjà commencé |
-| **2 · Analyse** | Sous-agents spécialisés (code, assets, docs, écrans, données) ; questions si l'intention est floue |
-| **3 · Plan de nettoyage** | Garder / déplacer / supprimer, vérifié automatiquement |
-| ✋ **Validation** | **Rien n'est copié sans ton accord** |
-| **4 · Application** | Copie, chemins réécrits, mémoire `.agents/` installée |
-| **5 · Fichiers racine** | README, ADR, `screens.md`, `stack.md` |
-| **6 · Fondations** | Base vérifiée ✅ / ⚠️ / ❌ et exigences de sécurité |
-| **7 · Plan de production** | Mode complet : plan superpowers, les ❌ deviennent la phase 0 |
-| **8 · Audit** | Mode complet : guidance de la skill `security-audit` de Cloudflare |
-| **9 · Clôture** | Prochaine étape exacte, contrôle final, git sur demande |
+| **0 · Framing** | Source, target, mode, stack, agents to wire up |
+| **1 · Inventory** | Files, screens, intent; new or already-started project; duplicate groups analyzed (`dedupe`) |
+| **2 · Analysis** | Specialized sub-agents (code, assets, docs, screens, data); questions if the intent is unclear |
+| **3 · Cleanup plan** | Keep / move / delete / merge, automatically verified |
+| ✋ **Approval** | **Nothing is copied without your agreement** |
+| **4 · Apply** | Copy, paths rewritten, `.agents/` memory installed, AI traces removed (proof per file) |
+| **5 · Root files** | README, ADR, `screens.md`, `stack.md` |
+| **6 · Foundations** | Base verified ✅ / ⚠️ / ❌ and security requirements |
+| **7 · Production plan** | Full mode: superpowers plan, the ❌ become phase 0 |
+| **8 · Audit** | Full mode: guidance from Cloudflare's `security-audit` skill |
+| **9 · Wrap-up** | Exact next step, final check, git on request |
 
-**Deux modes :**
+**Two modes:** *Quick* (default) runs steps 0–6; *Full* adds 7–8. If a companion skill (superpowers, security-audit) isn't installed, the skill does the equivalent by hand — the plan/audit is written manually with the same structure — and only installs it with your agreement.
 
-| | Rapide (défaut) | Complet |
-|---|---|---|
-| Étapes 0 à 6 | ✅ | ✅ |
-| Plan superpowers (étape 7) | — | ✅ |
-| Audit Cloudflare (étape 8) | — | ✅ |
+### Stacks, based on what you're building
 
-Si une skill compagnon (superpowers, security-audit) n'est pas installée, la skill fait l'équivalent à la main et ne l'installe qu'avec ton accord.
-
-### Stacks selon ce que tu construis
-
-| Tu construis | Stack conseillée |
+| You're building | Recommended stack |
 |---|---|
-| Site vitrine | Astro + Tailwind, îlots Svelte ou React |
-| Dashboard | SvelteKit ou Next.js · Rust Axum + PostgreSQL |
-| App desktop | Tauri 2 |
+| Showcase site | Astro + Tailwind, Svelte or React islands |
+| Dashboard | SvelteKit or Next.js · Rust Axum + PostgreSQL |
+| Desktop app | Tauri 2 |
 | iOS / Android | SwiftUI / Jetpack Compose |
 
-Tes maquettes utilisent déjà un framework, ou un backend comme Supabase ? Il est gardé. Tu peux aussi imposer tes propres choix avec un profil de stack (variable `DESIGN_TO_DEV_STACK`). Détails : [`references/stacks.md`](references/stacks.md).
+Already using a framework in your mockups, or a backend like Supabase? It's kept. You can also enforce your own choices with a stack profile (`DESIGN_TO_DEV_STACK`). Details: `references/stacks.md`.
 
----
+## Smart duplicates — analyze, never blind-delete
 
-## Ce que tu obtiens
+Duplicate detection is a **decision aid, not a shredder**:
+
+```sh
+npx design-to-dev dedupe ./my-design --out merge-actions.json
+```
+
+- **Exact duplicates** (identical bytes): the canonical copy is the most-referenced one with the cleanest name. Others get a **merge** action (`delete` + `replaced_by`) — every reference pointing to them is rewritten to the canonical file when the plan is applied.
+- **Near-duplicates** (same content modulo comments/whitespace, e.g. a `Button` linked from one screen and its tweaked variant linked from another): **never auto-deleted**. They're flagged `review` so you decide together: merge into one file (references rewritten), or keep both under clear names because each serves a different screen.
+- `plan-check` **rejects** deleting a duplicate that's still referenced unless `replaced_by` is set — a file that supports the design can't silently disappear.
+
+## AI trace removal — thorough by default
+
+```sh
+npx design-to-dev ai-traces clean ./my-project --dry-run   # preview, nothing written
+npx design-to-dev ai-traces clean ./my-project             # → docs/cleanup/traces-ia.md
+```
+
+Removed automatically (with a per-file proof the design is unchanged):
+
+- signature comments (*Generated by / Made with* <AI tool>), `<meta name="generator">` from AI tools, Markdown footers (*🤖 Generated with…*, `Co-Authored-By`), *"This project was built with…"* lines
+- **boilerplate sections** (*## Build with Lovable*, *## Built with v0*…) up to the next heading
+- **tracking attributes** (`data-lov-id`, `data-lov-name`, `data-component-*` — never inside strings or comments)
+- **injected scripts** (`cdn.gpteng.co/gptengineer.js`…) and **badges** (link to the tool's domain + *Edit with / Made with…* text, no nested content)
+- **the component tagger**: `lovable-tagger` import, `componentTagger()` calls, and its `package.json` entry (verified by JSON comparison)
+- invisible watermark characters (zero-width, bidi controls, Unicode tags — typography, emoji and RTL text preserved)
+
+Only flagged (⚠️, never touched automatically): badges with nested content, links that are real content (favicon, og:image, deployment URL), **functional dependencies** (e.g. `@lovable.dev/mcp-js` actually imported by the code), traces mixed into code or strings. A sub-agent reviews them one by one with before/after screenshots.
+
+**The proof:** before writing, code tokens, strings, attributes and rendered text must be identical before/after (voluntary AI removals are normalized on both sides of the comparison); for `package.json`, the result must be exactly the original minus the removed keys. Otherwise the file is left untouched and marked ❌ in the report. Atomic writes; git history is never rewritten.
+
+## What you get
 
 ```
-mon-projet/
-├── .agents/                  mémoire partagée par tous les agents
-├── AGENTS.md                 règles communes à tous les agents
-├── CLAUDE.md  GEMINI.md …    adaptateurs, selon les agents choisis
+my-project/
+├── .agents/                  memory shared by all agents
+│   ├── memory/               etat.md, journal.md, decisions.md, problemes.md,
+│   │                         changements.md, MEMORY.md (starts with the project's origin)
+│   ├── hooks/memory_hook.py  auto-updates + context injection
+│   └── graph/graph.json      who imports what, which sessions touched what
+├── AGENTS.md                 rules common to all agents
+├── CLAUDE.md  GEMINI.md …    adapters, per chosen agent
 ├── src/
 │   ├── styles/               tokens, CSS
 │   ├── components/
 │   └── assets/
-├── prototypes/               écrans HTML jouables
+├── prototypes/               playable HTML screens
 ├── docs/
-│   ├── design/screens.md     chaque écran → route, endpoint
-│   ├── architecture/         stack et contrat backend
-│   ├── security/             fondations, baseline, exigences
-│   ├── adr/                  décisions d'architecture
-│   └── cleanup/              rapport + file-map.json (avant → après)
+│   ├── design/screens.md     each screen → route, endpoint
+│   ├── architecture/         stack and backend contract
+│   ├── security/             foundations, baseline, requirements
+│   ├── adr/                  architecture decisions
+│   └── cleanup/              report + file-map.json (before → after) + traces-ia.md
 ├── README.md
 └── .gitignore
 ```
 
----
+## The shared memory
 
-## La mémoire partagée
+One source of truth in `.agents/`, versioned with the project. Each agent reaches it through a small adapter — no duplicated memories that drift apart.
 
-Une seule source de vérité dans `.agents/`, versionnée avec le projet. Chaque agent y accède par un petit adaptateur, donc pas de mémoires en double qui divergent.
-
-| Fichier | Rôle |
+| File | Role |
 |---|---|
-| `etat.md` | Où on en est et **prochaine étape exacte** (lu en premier) |
-| `journal.md` | Historique de chaque étape, signé par l'agent |
-| `decisions.md` | Choix techniques et leurs raisons |
-| `problemes.md` | Pièges rencontrés et solutions |
-| `changements.md` | Fichiers créés, modifiés, déplacés, supprimés |
-| `MEMORY.md` | Index, qui commence par l'**origine du projet** (source, date, fondations vérifiées) |
-| `graph.json` | Qui importe qui, quelles sessions ont touché quoi |
+| `etat.md` | Where we are and the **exact next step** (read first) |
+| `journal.md` | History of every step, signed by the agent |
+| `decisions.md` | Technical choices and their reasons |
+| `problemes.md` | Pitfalls met and their solutions |
+| `changements.md` | Files created, modified, moved, deleted |
+| `MEMORY.md` | Index, starting with the **project's origin** (source, date, verified foundations) |
+| `graph.json` | Who imports whom, which sessions touched what |
 
-**Remplie en direct.** La mémoire se remplit dès l'étape 0, pas à la fin : chaque étape laisse une trace horodatée, puis tout est importé dans le projet à l'étape 4. Un secret ou une consigne cachée est refusé et rien n'est écrit.
+**Filled live** from step 0, not at the end: every step leaves a timestamped trace, then everything is imported into the project at step 4. A secret or a hidden instruction is refused and nothing is written.
 
-**Par agent :**
-
-| Agent | Lit la mémoire via | Mise à jour automatique |
+| Agent | Reads the memory via | Auto-updated |
 |---|---|---|
-| Claude Code | `CLAUDE.md` → `AGENTS.md` | Oui, par hooks |
-| Codex | `AGENTS.md` | Oui, par hooks (à approuver une fois via `/hooks`) |
-| Cursor, Gemini CLI, Copilot | règle ou fichier d'instructions | Non : l'agent suit le protocole écrit |
+| Claude Code | `CLAUDE.md` → `AGENTS.md` | Yes, via hooks |
+| Codex | `AGENTS.md` | Yes, via hooks (approve once with `/hooks`) |
+| Cursor, Gemini CLI, Copilot | rule or instructions file | No: the agent follows the written protocol |
 
----
+## Security
 
-## Sécurité
+Security comes **before** planning: a plan built on a shaky base inherits its flaws.
 
-La sécurité passe **avant** le plan : un plan bâti sur une base douteuse hérite de ses failles.
-
-```bash
-npx design-to-dev foundations ./mon-projet --strict
-npx design-to-dev deps ./mon-projet --online     # failles connues, versions stables, fin de support
-npx design-to-dev security-kit install ./mon-projet   # skills de sécurité épinglées dans .claude/skills (accord requis)
-npx design-to-dev security-kit verify ./mon-projet    # avant chaque commit
-npx design-to-dev ai-traces clean ./mon-projet        # retire les traces d'IA, design inchangé
+```sh
+npx design-to-dev foundations ./my-project --strict
+npx design-to-dev deps ./my-project --online     # known CVEs, stable versions, end-of-life
+npx design-to-dev security-kit install ./my-project   # pinned security skills in .claude/skills (consent required)
+npx design-to-dev security-kit verify ./my-project    # before each commit
 ```
 
-| Contrôle | Exemples |
+| Check | Examples |
 |---|---|
-| Bibliothèques | jQuery < 3.5, AngularJS 1.x, dépendances avec CVE connue |
-| Scripts d'installation | `postinstall` qui télécharge ou exécute du code |
-| Code caché | `eval(atob(…))`, code obfusqué, gros blocs base64 |
-| Fichiers étrangers | `.exe`, `.php`, `.htaccess`, scripts shell |
-| Caractères invisibles | Unicode bidirectionnel (Trojan Source) |
-| Consignes cachées pour IA | texte qui tente de piloter un agent |
-| Secrets | clés en dur, vrai `.env` |
-| Dépendances (`--online`) | failles connues et ce qu'elles touchent, version corrigée, dernière version stable, historique, paquets abandonnés ou malveillants |
-| Runtimes et frameworks | PHP, Node, Python, Laravel… en fin de support, version maintenue conseillée |
-| Traces d'IA | commentaires « Generated by », `<meta name="generator">` d'outil IA, filigranes Unicode invisibles |
+| Libraries | jQuery < 3.5, AngularJS 1.x, dependencies with known CVEs |
+| Install scripts | `postinstall` that downloads or runs code |
+| Hidden code | `eval(atob(…))`, obfuscated code, large base64 blocks |
+| Foreign files | `.exe`, `.php`, `.htaccess`, shell scripts |
+| Invisible characters | bidirectional Unicode (Trojan Source) |
+| Hidden AI instructions | text trying to steer an agent |
+| Secrets | hardcoded keys, real `.env` |
+| Dependencies (`--online`) | known vulns and what they affect, fixed version, latest stable, history, abandoned or malicious packages |
+| Runtimes & frameworks | PHP, Node, Python, Laravel… end-of-support, advised maintained version |
 
-### Traces d'IA
+The **security kit** copies selected security skills into `.claude/skills/`, **pinned** (commit + SHA-256 of each file) and **scanned before install**. Nothing is installed without your agreement. Details: `references/security.md`.
 
-Par défaut, `ai-traces clean` retire de la **cible** (jamais de la source) les signatures laissées par Claude, Codex, Copilot et les autres outils d'IA :
+### Use in CI
 
-- les commentaires et pieds de page « Generated by / Made with » ;
-- les balises `<meta name="generator">` des outils d'IA ;
-- les caractères invisibles qui servent de filigrane (espaces de largeur nulle, joints, contrôles bidirectionnels).
+`foundations --strict` exits non-zero on any ❌ — plug it into your pipeline:
 
-L'outil ne touche ni au code ni aux chaînes de caractères. Un invisible trouvé dans du code, du JSON ou une chaîne est seulement signalé ⚠️ : un sous-agent le retire à la main, avec des captures avant / après. Chaque fichier nettoyé est vérifié : une fois les traces enlevées, son contenu doit rester identique. Sinon, le fichier n'est pas modifié. `--dry-run` montre ce qui serait retiré, et le rapport est écrit dans `docs/cleanup/traces-ia.md`. Les agents n'ajoutent pas de traces : la mémoire du projet le leur interdit, et `ai-traces scan` est lancé avant chaque commit.
+```yaml
+# .github/workflows/foundations.yml
+on: [push]
+jobs:
+  foundations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: npx -y design-to-dev foundations . --strict
+      - run: npx -y design-to-dev ai-traces scan . --strict
+```
 
-### Kit de sécurité du projet
+## Environment variables
 
-`security-kit` copie dans `.claude/skills/` des skills de sécurité choisies, **à une version épinglée** (commit + empreinte SHA-256 de chaque fichier) et **scannées avant l'installation**. La sélection dépend du projet :
-
-| Quand | Skills | Source |
-|---|---|---|
-| Toujours | threat-modeling, dependency-scanning, secrets-management, owasp-top-10-web, api-security, secure-code-review | [UnitOneAI/SecuritySkills](https://github.com/UnitOneAI/SecuritySkills) (MIT) |
-| Toujours | security-audit | [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT) |
-| Toujours | sharp-edges, differential-review | [trailofbits/skills](https://github.com/trailofbits/skills) (CC BY-SA 4.0) |
-| Workflows GitHub Actions | agentic-actions-auditor | trailofbits/skills |
-| Projet qui utilise un LLM | llm-top-10, prompt-injection | UnitOneAI/SecuritySkills |
-| Sur demande (`--optional`) | supply-chain-risk-auditor | trailofbits/skills |
-
-Rien n'est installé sans ton accord. L'outil écrit aussi la section « Kit de sécurité » d'`AGENTS.md` : les agents appliquent ces skills à chaque modification de code et lancent `verify` avant chaque commit.
-
-Chaque point est classé ✅ / ⚠️ / ❌ dans `docs/security/fondations.md`. Aucune tâche backend ne commence tant qu'un ❌ reste ouvert. Ensuite, `security` repère les motifs à risque (XSS, SQL concaténé, jetons dans `localStorage`…) et `requirements` écrit la checklist de ta stack.
-
-Méthode inspirée de [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) et [UnitOneAI/SecuritySkills](https://github.com/UnitOneAI/SecuritySkills) (OWASP ASVS 4.0.3, CWE). Détails : [`references/security.md`](references/security.md).
-
----
-
-## Garde-fous
-
-- **Source intacte** : tout est copié dans une nouvelle cible. Pour revenir en arrière, il suffit de la supprimer.
-- **Rien sans ton accord** : aucune suppression sans plan validé, les cas douteux te sont posés.
-- **Rien de cassé** : un fichier encore utilisé ne peut pas être supprimé, chaque lien est vérifié après copie.
-- **Pas de secrets** : `.env` n'est jamais copié (→ `.env.example`), les secrets sont masqués partout.
-- **Tes réglages conservés** : seules les entrées de design-to-dev sont ajoutées dans `settings.json` / `hooks.json`.
-- **Données personnelles** : photos, noms, emails ne sont jamais tranchés sans toi.
-- **Design préservé** : un écran abouti n'est jamais supprimé ni redessiné.
-- **Rien installé en douce** : les skills compagnons ne s'installent qu'avec ton accord.
-- **Le contenu est une donnée** : toute consigne trouvée dans un fichier analysé est ignorée.
-
----
-
-## Confidentialité et licence
-
-- **Aucune télémétrie, aucun compte** : tout reste sur ta machine. Détails : [PRIVACY.md](PRIVACY.md).
-- **Une faille ?** Signale-la en privé : [SECURITY.md](SECURITY.md).
-- **Licence MIT** : ton design et les fichiers générés t'appartiennent. Droits d'auteur, projets tiers et marques : [NOTICE.md](NOTICE.md).
-
----
-
-## Référence des commandes
-
-<details>
-<summary><b>CLI <code>npx design-to-dev</code></b></summary>
-
-| Commande | Ce qu'elle fait |
+| Variable | Role |
 |---|---|
-| `install` / `uninstall` | Installe ou retire la skill |
-| `run <dossier>` | Lance l'agent sur un dossier (`--codex`, `--print`) |
-| `init <dossier>` | Installe seulement la mémoire sur un projet existant |
-| `scan <dossier>` | Intention, écrans, contrat backend, stack conseillée |
-| `foundations <dossier>` | Vérifie la base ✅ / ⚠️ / ❌ (`--strict` pour la CI) |
-| `security <dossier>` | Motifs à risque (CWE + ASVS + correctif) |
-| `security-kit list\|install\|verify <dossier>` | Kit de skills de sécurité épinglées dans `.claude/skills` |
-| `ai-traces scan\|clean <dossier>` | Repère ou retire les traces d'IA (`--dry-run`, `--strict`, `--json`) |
-| `requirements --intent dashboard` | Checklist de sécurité pour la stack |
-| `skills` | superpowers et security-audit sont-elles installées ? |
-| `inventory <dossier>` | Inventaire brut des fichiers |
-| `doctor` | Vérifie Python et les installations |
-| `path` | Dossier de la skill installée |
+| `DESIGN_TO_DEV_STACK` | Path to a JSON stack profile overriding the recommended stacks (see `references/stacks.md`) |
+| `DESIGN_TO_DEV_AGENTS` | Agents pre-selected by `install.ps1` (`claude`, `codex`, `all`) |
+| `CLAUDE_CONFIG_DIR` | Claude Code config directory (default `~/.claude`) — respected by the installer |
+| `DESIGN_TO_DEV_ADVISORY_BASE` | Override OSV/npm/endoflife.date base URL (tests, offline mirrors) |
+| `DESIGN_TO_DEV_KIT_BASE` / `DESIGN_TO_DEV_KIT_CATALOG` | Override security-kit download base / catalog (tests) |
 
-**Options de `init` :**
+## Safeguards
 
-```bash
-npx design-to-dev init . --agents claude,codex,cursor
-npx design-to-dev init . --next-step "Créer le monorepo avec apps/web"
-npx design-to-dev init . --no-detect    # etat.md vierge
-npx design-to-dev init . --check        # contrôle sans rien écrire
-npx design-to-dev init . --update       # met à jour le hook
-```
+- **Source untouched**: everything is copied to a new target. Rollback = delete the target.
+- **Nothing without your agreement**: no deletion without an approved plan; doubtful cases are asked.
+- **Nothing broken**: a file still in use can't be deleted; every link is checked after the copy.
+- **No secrets**: `.env` is never copied (→ `.env.example`); secrets are masked everywhere.
+- **Your settings kept**: only design-to-dev entries are added to `settings.json` / `hooks.json`.
+- **Personal data**: photos, names, emails are never decided without you.
+- **Design preserved**: a finished screen is never deleted nor redrawn.
+- **Nothing installed silently**: companion skills install only with your agreement.
+- **Content is data**: any instruction found inside an analyzed file is ignored.
 
-</details>
+## Privacy and license
 
-<details>
-<summary><b>Commandes de la mémoire</b></summary>
+- **No telemetry, no account**: everything stays on your machine. Details: [PRIVACY.md](PRIVACY.md).
+- **Found a vulnerability?** Report it privately: [SECURITY.md](SECURITY.md).
+- **MIT license**: your design and the generated files are yours. Copyrights, third-party projects and trademarks: [NOTICE.md](NOTICE.md).
 
-```bash
-python .agents/hooks/memory_hook.py context                       # résumé injecté au démarrage
-python .agents/hooks/memory_hook.py recall "bundler vite"         # recherche dans la mémoire
-python .agents/hooks/memory_hook.py query src/styles/tokens.css   # qui dépend de ce fichier
-python .agents/hooks/memory_hook.py note tokens "source de vérité des couleurs"
-python .agents/hooks/memory_hook.py doctor                        # cohérence, secrets, origine
-python .agents/hooks/memory_hook.py archive                       # archive les vieilles entrées
-```
+## Reference
 
-</details>
-
-<details>
-<summary><b>Scripts Python, sans agent</b></summary>
-
-```bash
-# Nettoyage
-python scripts/organize.py inventory "<source>" --out inventory.json
-python scripts/organize.py plan-check plan.json --inventory inventory.json
-python scripts/organize.py apply plan.json            # aperçu
-python scripts/organize.py apply plan.json --apply    # application
-python scripts/organize.py verify "<cible>"
-
-# Détection et sécurité
-python scripts/detect_project.py scan "<source>" --out design-inventory.json
-python scripts/security_check.py foundations "<cible>" --strict
-python scripts/security_check.py scan "<cible>" --out baseline.json
-python scripts/security_check.py requirements --intent dashboard
-
-# Mémoire de préproduction
-python scripts/preprod_log.py journal --dir "$M" --step 3 --agent claude-code "arbre cible validé"
-python scripts/scaffold_memory.py "<cible>" --agents claude,codex --import-preprod "$M"
-python scripts/scaffold_memory.py "<cible>" --check
-```
-
-Format du plan : [`references/plan-format.md`](references/plan-format.md). Tests : `npm test`.
-
-</details>
-
-<details>
-<summary><b>Contenu du dépôt</b></summary>
-
-| Chemin | Rôle |
-|---|---|
-| [`SKILL.md`](SKILL.md) | Déroulé de la skill (étapes 0 à 9) |
-| [`references/`](references/) | Conventions, stacks, sécurité, format du plan, prompts des sous-agents |
-| [`scripts/organize.py`](scripts/organize.py) | Inventaire, vérification du plan, copie, vérification des liens |
-| [`scripts/detect_project.py`](scripts/detect_project.py) | Intention, écrans, contrat backend, skills compagnons |
-| [`scripts/security_check.py`](scripts/security_check.py) · [`scripts/foundations.py`](scripts/foundations.py) | Fondations, motifs à risque, exigences |
-| [`scripts/preprod_log.py`](scripts/preprod_log.py) | Mémoire remplie en direct pendant la préproduction |
-| [`scripts/scaffold_memory.py`](scripts/scaffold_memory.py) | Création de `.agents/` et des adaptateurs par agent |
-| [`templates/agents/`](templates/agents/) | Protocole mémoire et hook `memory_hook.py` |
-| [`bin/cli.js`](bin/cli.js) | CLI npx |
-| [`install.sh`](install.sh) · [`install.ps1`](install.ps1) | Installation sans npm |
-| [`tests/`](tests/) | Tests de bout en bout |
-
-</details>
-
----
-
-<div align="center">
-
-[Licence MIT](LICENSE) · [Confidentialité](PRIVACY.md) · [Sécurité](SECURITY.md) · [Mentions](NOTICE.md)
-
-Projet indépendant, sans lien avec Anthropic, OpenAI ni les outils cités
-
-</div>
+Full CLI, memory commands, raw Python scripts and repo layout: **[docs/commands.md](docs/commands.md)**. Troubleshooting and FAQ included there.

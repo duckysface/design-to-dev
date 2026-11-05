@@ -1,0 +1,28 @@
+{
+  "source": "messy-export",
+  "target": "messy-export-clean",
+  "actions": [
+    { "src": "screen1.html", "action": "move", "dst": "prototypes/screen1.html",
+      "reason": "écran abouti, conservé tel quel", "confidence": 1.0, "agent": "code" },
+    { "src": "screen2.html", "action": "move", "dst": "prototypes/screen2.html",
+      "reason": "écran abouti, conservé tel quel", "confidence": 1.0, "agent": "code" },
+    { "src": "Button.jsx", "action": "move", "dst": "src/components/Button.jsx",
+      "reason": "copie canonique du doublon (la plus référencée)", "confidence": 1.0, "agent": "code" },
+    { "src": "Button (copy).jsx", "action": "delete", "replaced_by": "Button.jsx",
+      "reason": "doublon exact de Button.jsx — sa référence dans screen2.html est réécrite",
+      "confidence": 1.0, "agent": "code" },
+    { "src": "styles.css", "action": "move", "dst": "src/styles/styles.css",
+      "reason": "tokens, source de vérité des couleurs", "confidence": 0.95, "agent": "code" },
+    { "src": "tokens-old.css", "action": "delete",
+      "reason": "ancienne palette remplacée par styles.css, non référencée",
+      "confidence": 0.9, "agent": "code" },
+    { "src": "README.md", "action": "move", "dst": "docs/design-system/README.md",
+      "reason": "documentation du design system (traces d'IA retirées au nettoyage)",
+      "confidence": 0.9, "agent": "docs-tooling" },
+    { "src": "uploads/pasted-1792877667710-0.png", "action": "delete",
+      "reason": "capture collée, orpheline (aucune référence) — suppression validée",
+      "confidence": 0.8, "agent": "assets" },
+    { "src": ".DS_Store", "action": "delete", "reason": "déchet système", "confidence": 1.0,
+      "agent": "docs-tooling" }
+  ]
+}

@@ -26,6 +26,12 @@ Champs :
 - `dst` : obligatoire pour `move` ; relatif à la cible.
 - `reason` (obligatoire), `confidence` (0–1), `agent`, `review` (bool), `replaced_by` (chemin source du remplaçant).
 
+Doublons (`replaced_by`) :
+- `python scripts/organize.py dedupe <source>` analyse les groupes de doublons et propose des actions prêtes à intégrer : doublon exact → `delete` + `replaced_by` vers la copie canonique (la plus référencée) ; quasi-doublon (`near-duplicate`, même contenu aux commentaires et espaces près) → `review`, car deux variantes proches peuvent servir des écrans différents.
+- À l'application, toutes les références vers un fichier supprimé avec `replaced_by` sont réécrites vers la cible du remplaçant (chemins relatifs recalculés).
+- `plan-check` refuse : la suppression d'un doublon (exact ou quasi) encore référencé sans `replaced_by`, un `replaced_by` inexistant ou lui-même supprimé, et la suppression d'un quasi-doublon sans `replaced_by` ni `review`.
+- Pour fusionner deux variantes en un seul fichier : `delete` + `replaced_by` sur la variante sacrifiée, puis adapter le fichier canonique si les contenus diffèrent (décision utilisateur, notée dans `reason`).
+
 Un dossier entier peut être traité avec un glob dans `src` (`"uploads/pasted-*"`, `"node_modules/**"`) et une action `delete`, ou `move` avec `dst` finissant par `/` (le reste du chemin est conservé : `"src": "ui_kits/**", "dst": "prototypes/"` → `ui_kits/admin/index.html` devient `prototypes/admin/index.html`). Une entrée explicite l'emporte sur un glob ; entre deux globs, le plus long l'emporte.
 
 Avant `apply`, les éléments `review: true` doivent avoir été tranchés par l'utilisateur (retirer `review` ou changer l'action). `apply --apply` refuse un plan qui contient encore des `review`.

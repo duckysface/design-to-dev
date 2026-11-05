@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.9", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: node bin/cli.js --version
+      - run: python tests/test_memory.py
+      - run: python tests/test_project.py
+      - run: python tests/test_pipeline.py
+
+  self-check:
+    # Dogfooding : le nettoyeur ne doit jamais trouver de retrait automatique dans ce dépôt.
+    # (Les ⚠️ restants sont attendus : la doc et les docstrings DÉCRIVENT ces motifs.)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: No auto-removable AI trace in the repo
+        run: |
+          python scripts/ai_traces.py scan . --json > scan.json
+          python - <<'EOF'
+          import json
+          data = json.load(open("scan.json", encoding="utf-8"))
+          removable = sum(len(f["removed"]) for f in data["files"])
+          assert not data["refused"], data["refused"]
+          assert removable == 0, f"{removable} retrait(s) automatique(s) trouvé(s) dans le dépôt"
+          print(f"OK — {data['scanned']} fichiers, aucun retrait automatique possible")
+          EOF

@@ -6,16 +6,23 @@ Retiré automatiquement, et seulement quand c'est sûr :
     « Co-Authored-By: Claude ») : commentaire seul sur sa ligne, ou `// …` en fin de ligne ;
   - `<meta name="generator">` qui nomme un outil IA ;
   - pieds de page Markdown « 🤖 Generated with [Claude Code](…) » et lignes « Co-Authored-By: <IA> » (hors blocs de code) ;
+  - attributs de traçage injectés dans le balisage : `data-lov-id`, `data-lov-name`, `data-component-*`
+    (jamais dans une chaîne ni un commentaire) ;
+  - scripts injectés par l'outil IA (ex. `cdn.gpteng.co/gptengineer.js`) et badges « Edit with Lovable »
+    (lien vers le domaine de l'outil + texte de badge, sans contenu imbriqué) ;
+  - plugin de marquage des composants : import de `lovable-tagger` et appels `componentTagger()` dans le code,
+    entrée correspondante dans `package.json` (preuve par comparaison JSON) ;
   - caractères invisibles servant de filigrane : U+200B entre caractères latins, U+2060–2064, U+180E, BOM en milieu
     de fichier, contrôles bidirectionnels (lignes sans texte RTL), caractères tag (sauf drapeaux 🏴), U+200C/U+200D
     entre deux caractères ASCII.
 Conservé : espaces insécables (NBSP, NNBSP), sélecteurs de variation, ZWJ des emojis et des écritures non latines.
-Seulement signalé (⚠️, retrait par un sous-agent après vérification visuelle) : badges « Edit with Lovable »,
-scripts injectés, attributs `data-lov-id`, plugins de marquage, liens vers l'outil, traces mêlées à du code.
+Seulement signalé (⚠️, retrait par un sous-agent après vérification visuelle) : badges avec contenu imbriqué,
+liens vers l'outil (favicon, og:image), traces mêlées à du code, invisibles dans des chaînes.
 
 Preuve : avant d'écrire, le code hors commentaires (jetons) et les commentaires conservés doivent être identiques
-avant/après ; pour HTML, SVG et XML, le flux d'événements du parseur (balises, attributs, texte) aussi. Sinon le
-fichier n'est pas modifié. Écriture atomique. L'historique git n'est jamais réécrit.
+avant/après, les mêmes retraits d'IA étant normalisés des deux côtés ; pour HTML, SVG et XML, le flux d'événements
+du parseur (balises, attributs, texte) aussi ; pour `package.json`, le JSON résultant doit être l'original moins
+les clés retirées. Sinon le fichier n'est pas modifié. Écriture atomique. L'historique git n'est jamais réécrit.
 
   ai_traces.py scan <dossier> [--strict] [--json]
   ai_traces.py clean <dossier> [--dry-run] [--out docs/cleanup/traces-ia.md] [--json]
@@ -49,7 +56,9 @@ AI = (r"(?:claude(?:\s+code)?|claude\.ai|anthropic(?:'s)?(?:\s+claude)?|chat\s?g
       r"openai(?:\s+codex)?|codex(?:\s+cli)?|(?:github\s+)?copilot|cursor(?:\s+ai)?|windsurf|codeium|"
       r"(?:google\s+)?gemini(?:\s+(?:cli|code\s+assist))?|google\s+stitch|bard|(?:vercel\s+)?v0(?:\.dev)?|"
       r"lovable(?:\.dev)?|gpt[- ]?engineer|bolt(?:\.new)?|replit(?:\s+agent)?|devin|tabnine|aider|cline|kiro|"
-      r"amazon\s+q|codewhisperer|jules|same\.dev|stitch|figma\s+make|(?:an?\s+)?ai(?:\s+(?:assistant|agent|model|tool))?)")
+      r"amazon\s+q|codewhisperer|jules|same\.dev|stitch|figma\s+make|trae(?:\.ai)?|antigravity|"
+      r"augment(?:\s*code)?|roo(?:\s+code)?|firebase\s+studio|base44|create\.xyz|softgen|tempo(?:\.new)?|"
+      r"qodo(?:\s*gen)?|(?:an?\s+)?ai(?:\s+(?:assistant|agent|model|tool))?)")
 TAIL = (r"(?:[\s,.:;()\[\]—–-]+(?:v?\d[\w.-]*|https?://\S+|www\.\S+|ai|assistant|agent|code|chat|model|by|on|at|"
         r"anthropic|openai|google|vercel|[\w.-]+\.(?:dev|app|com|ai|new|sh)|[\w.-]+@[\w.-]+|<[^>]*>))*[\s.!]*$")
 TRACE_FULL = re.compile(
@@ -64,9 +73,13 @@ TRACE_EXTRA = (re.compile(r"^co-authored-by:\s*\[?" + AI + r"\b.*$", re.I),
                           + r"\]?(?:\s*\([^)]*\))?" + TAIL, re.I))
 TRACE_ANY = re.compile(r"(?:\b(?:generated|created|written|built|made|authored|scaffolded)\s+(?:with|by|using|via)\s+"
                        r"\[?\b(?!an?\s+ai\b|ai\b)" + AI + r"\b|\bco-authored-by:\s*\[?" + AI + r"\b)", re.I)
-LINE_TRACE = re.compile(r"^[ \t]*[*_]*(?:🤖[ \t]*)?(?:generated|created|built|made)[ \t]+(?:with|by|using)[ \t]+\[?"
+LINE_TRACE = re.compile(r"^[ \t]*[*_]*(?:🤖[ \t]*)?(?:this\s+[\w][\w' -]{0,28}?\s+(?:was|is)\s+)?"
+                        r"(?:generated|created|built|made)[ \t]+(?:with|by|using)[ \t]+\[?"
                         + AI + r"\]?(?:\([^)\n]*\))?[*_]*[ \t.!]*(?:\r?\n|$)|^[ \t]*co-authored-by:[ \t]*" + AI
                         + r"\b[^\n]*(?:\n|$)", re.I | re.M)
+AI_BOILER_HEAD = re.compile(r"^#{1,6}[ \t]+[^\n]*\b(?:build(?:ed|ing)?|built|made|edit(?:ing|or)?|"
+                            r"develop(?:ing|ment|ed)?|deploy(?:ing|ment|ed)?|designed|powered|"
+                            r"publish(?:ed|ing)?)\b[^\n]*\b" + AI + r"\b[^\n]*$", re.I)
 BLANK_RE = re.compile(r"[ \t]*\r?\n")
 JSX_RE = re.compile(r"\{(\s*/\*(.*?)\*/\s*)\}", re.S)
 META_RE = re.compile(r"<meta\b[^>]*>", re.I)
@@ -76,17 +89,34 @@ AI_VALUE = re.compile(r"^\s*" + AI + r"\b", re.I)
 FLAGS = (
     ("ai-badge", re.compile(r"\b(?:made|built|edit(?:ed)?|created|designed|powered)\s+(?:with|in|on|by)\s+(?:lovable|"
                             r"bolt(?:\.new)?|v0|replit|same\.dev|claude|chatgpt|gemini|cursor|windsurf|figma\s+make|"
-                            r"stitch)\b", re.I),
+                            r"stitch|trae|tempo|base44|create\.xyz|softgen)\b", re.I),
      "badge ou mention visible de l'outil IA"),
     ("ai-script", re.compile(r"cdn\.gpteng\.co|gptengineer\.js", re.I), "script injecté par l'outil IA"),
     ("ai-tagger", re.compile(r"\blovable-tagger\b|\bcomponentTagger\b"),
-     "plugin de marquage des composants : retirer l'import, l'appel dans vite.config et la dépendance"),
+     "plugin de marquage des composants : vérifier qu'il ne reste ni import, ni appel, ni dépendance"),
     ("ai-attr", re.compile(r"\bdata-lov-(?:id|name)\b|\bdata-component-(?:path|line|file|name|content)\b"),
      "attribut de traçage ajouté par l'outil IA"),
-    ("ai-link", re.compile(r"\b(?:lovable\.(?:dev|app)|v0\.dev|bolt\.new|gpteng\.co|same\.dev)\b", re.I),
+    ("ai-link", re.compile(r"\b(?:lovable\.(?:dev|app)|v0\.dev|bolt\.new|gpteng\.co|same\.dev|trae\.ai|"
+                           r"base44\.(?:com|app)|create\.xyz|tempo\.new|softgen\.(?:ai|app))\b", re.I),
      "lien vers l'outil IA (og:image, favicon, lien…)"),
     ("ai-trace", TRACE_ANY, "trace mêlée à du code ou à du texte : à retirer à la main"),
 )
+
+# Retraits automatiques au-delà des commentaires (appliqués aussi dans signature() pour la preuve).
+TAG_RE = re.compile(r"<[A-Za-z][^<>]*>")
+TRACING_ATTR = re.compile(r"""\s+data-(?:lov-(?:id|name)|component-(?:path|line|file|name|content))"""
+                          r"""(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?""")
+AI_DOMAIN = r"(?:lovable\.(?:dev|app)|v0\.dev|bolt\.new|gpteng\.co|same\.dev|trae\.ai|base44\.(?:com|app)|create\.xyz|tempo\.new|softgen\.(?:ai|app))"
+AI_SCRIPT = re.compile(r"""<script\b[^>]*\bsrc\s*=\s*["'][^"']*(?:""" + AI_DOMAIN +
+                       r"""|gptengineer)[^"']*["'][^>]*>\s*</script\s*>""", re.I)
+BADGE_A = re.compile(r"""<a\b[^>]*\bhref\s*=\s*["'][^"']*""" + AI_DOMAIN +
+                     r"""[^"']*["'][^>]*>[^<]*(?:edit|made|built|created|designed|powered|generated)"""
+                     r"""[^<]*</a\s*>""", re.I)
+TAGGER_IMPORT = re.compile(r"""^[ \t]*import\s+(?:\{[^}\n]*\}|[\w*]+(?:\s+as\s+\w+)?)\s+from\s+"""
+                           r"""["']lovable-tagger["'];?[ \t]*\r?(?:\n|$)""", re.M)
+TAGGER_CALL = re.compile(r",[ \t]*componentTagger\(\s*\)|componentTagger\(\s*\)[ \t]*,|componentTagger\(\s*\)")
+AI_DEPS = {"lovable-tagger"}
+JSON_INDENT = re.compile(r'\{\r?\n([ \t]+)"')
 
 RTL = re.compile("[֐-ࣿיִ-﷿ﹰ-ﻼ]")
 BIDI = {chr(c) for c in (*range(0x202A, 0x202F), *range(0x2066, 0x206A))}
@@ -223,6 +253,173 @@ def line_bounds(text, start, end):
     return ls, (len(text) if le < 0 else le), (len(text) if le < 0 else le + 1)
 
 
+def string_spans(text, kind):
+    """Plages des littéraux de chaîne (c/hash) : leur contenu n'est jamais retouché."""
+    if kind not in ("c", "hash"):
+        return []
+    out, i, n = [], 0, len(text)
+    while i < n:
+        ch = text[i]
+        if kind == "hash" and text.startswith(('"""', "'''"), i):
+            j = text.find(text[i:i + 3], i + 3)
+            end = n if j < 0 else j + 3
+            out.append((i, end))
+            i = end
+        elif ch in "'\"" or (ch == "`" and kind == "c"):
+            j = i + 1
+            while j < n and text[j] != ch and not (text[j] == "\n" and ch != "`"):
+                j += 2 if text[j] == "\\" else 1
+            end = min(j + 1, n)
+            out.append((i, end))
+            i = end
+        elif kind != "hash" and text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        elif (kind == "c" and text.startswith("//", i)) or (kind == "hash" and ch == "#"):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        else:
+            i += 1
+    return out
+
+
+def overlap(a, b, spans):
+    return any(s < b and a < e for s, e in spans)
+
+
+def starts_inside(pos, spans):
+    """Le début de la construction est dans une zone protégée (chaîne, commentaire, bloc script/style) :
+    c'est alors du contenu, pas du code. Une construction qui CONTIENT une chaîne (import "…") reste,
+    elle, traitable : son début est hors de la chaîne."""
+    return any(s < pos < e for s, e in spans)
+
+
+def md_boiler_sections(text):
+    """Sections boilerplate d'outil IA (« ## Build with Lovable », « ## Built with v0 »…) :
+    du titre jusqu'au prochain titre de niveau égal ou supérieur (blocs de code exclus de la recherche)."""
+    lines = text.splitlines(keepends=True)
+    offs, fenced_state, in_fence, pos = [], [], False, 0
+    for ln in lines:
+        offs.append(pos)
+        fenced_state.append(in_fence)
+        if re.match(r"\s*(```|~~~)", ln):
+            in_fence = not in_fence
+        pos += len(ln)
+    heads = []
+    for i, ln in enumerate(lines):
+        if not fenced_state[i]:
+            m = re.match(r"(#{1,6})[ \t]+", ln)
+            if m:
+                heads.append((i, len(m.group(1))))
+    out = []
+    for i, level in heads:
+        if not AI_BOILER_HEAD.match(lines[i].rstrip("\r\n")):
+            continue
+        end = next((j for j, lv in heads if j > i and lv <= level), len(lines))
+        stop = offs[end] if end < len(lines) else len(text)
+        out.append((offs[i], stop, "section boilerplate", lines[i].strip()[:60]))
+    return out
+
+
+def ai_code_spans(text, kind):
+    """Retraits sûrs au-delà des commentaires : attributs de traçage, scripts injectés, badges,
+    plugin de marquage. Jamais dans une chaîne, un commentaire ou un bloc script/style.
+    signature() applique exactement les mêmes retraits avant de comparer : la preuve reste valide."""
+    spans = []
+    skip = []
+    if kind == "html":
+        skip = [m.span() for m in EMBED_RE.finditer(text)]
+    elif kind in ("c", "hash"):
+        skip = string_spans(text, kind) + [(a, b) for a, b, _, _ in comments(text, kind)]
+    if kind in ("html", "c"):
+        for m in TAG_RE.finditer(text):
+            if "data-" not in m.group(0) or starts_inside(m.start(), skip):
+                continue
+            for a in TRACING_ATTR.finditer(m.group(0)):
+                spans.append((m.start() + a.start(), m.start() + a.end(), "attribut de traçage",
+                              a.group(0).strip()[:60]))
+    if kind == "html":
+        for rx, label in ((AI_SCRIPT, "script injecté"), (BADGE_A, "badge")):
+            for m in rx.finditer(text):
+                if starts_inside(m.start(), skip):
+                    continue
+                ls, le, le_nl = line_bounds(text, m.start(), m.end())
+                whole = not text[ls:m.start()].strip() and not text[m.end():le].strip()
+                spans.append((ls, le_nl, label, m.group(0)[:60]) if whole
+                             else (m.start(), m.end(), label, m.group(0)[:60]))
+    if kind == "c":
+        for rx in (TAGGER_IMPORT, TAGGER_CALL):
+            for m in rx.finditer(text):
+                if not starts_inside(m.start(), skip):
+                    spans.append((m.start(), m.end(), "plugin de marquage", m.group(0).strip()[:60]))
+    if kind == "md":
+        spans += md_boiler_sections(text)
+    return spans
+
+
+def merge_spans(spans):
+    """Trie et fusionne les plages qui se recouvrent."""
+    merged = []
+    for s in sorted(spans):
+        if merged and s[0] < merged[-1][1]:
+            last = merged[-1]
+            merged[-1] = (last[0], max(last[1], s[1]), last[2], last[3])
+        else:
+            merged.append(s)
+    return merged
+
+
+def clean_pkg_json(text):
+    """package.json : retire les dépendances de marquage IA.
+    (nouveau texte, [dépendances retirées], preuve ok) — preuve : le JSON final doit être
+    l'original moins exactement ces clés, sinon rien n'est écrit."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return text, [], True
+    expected = json.loads(json.dumps(data))  # copie profonde
+    removed = []
+    for section in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
+        deps = expected.get(section)
+        if isinstance(deps, dict):
+            for name in sorted(deps):
+                if name in AI_DEPS:
+                    removed.append(f"{section}.{name}")
+                    del deps[name]
+    if not removed:
+        return text, [], True
+    new_text, surgical_ok = text, True
+    for entry in removed:
+        name = entry.split(".", 1)[1]
+        m = re.search(r'(?m)^[ \t]*"' + re.escape(name) + r'"\s*:\s*"[^"\n]*"(?P<comma>,)?[ \t]*\r?\n?',
+                      new_text)
+        if not m:
+            surgical_ok = False
+            break
+        start, end = m.start(), m.end()
+        if not m.group("comma"):  # dernière entrée de l'objet : retirer la virgule de la précédente
+            prev = new_text[:start].rstrip()
+            if prev.endswith(","):
+                new_text = prev[:-1] + "\n" + new_text[end:]
+                continue
+        new_text = new_text[:start] + new_text[end:]
+    if surgical_ok:
+        try:
+            if json.loads(new_text) == expected:
+                return new_text, removed, True
+        except ValueError:
+            pass
+    # Repli : réécriture complète avec l'indentation d'origine, validée par comparaison JSON.
+    indent = JSON_INDENT.search(text)
+    width = len(indent.group(1).replace("\t", "    ")) if indent else 2
+    dumped = json.dumps(expected, indent=width, ensure_ascii=False) + ("\n" if text.endswith("\n") else "")
+    try:
+        ok = json.loads(dumped) == expected
+    except ValueError:
+        ok = False
+    return (dumped, removed, ok) if ok else (text, [], True)
+
+
 def ai_meta(tag):
     if not META_NAME.search(tag):
         return False
@@ -260,14 +457,8 @@ def removals(text, kind):
                 if blank and re.search(r"\n[ \t]*\r?\n\Z", text[:m.start()]):
                     end = blank.end()  # pas de double ligne vide
                 spans.append((m.start(), end, "pied de page", m.group(0).strip()))
-    merged = []
-    for s in sorted(spans):
-        if merged and s[0] < merged[-1][1]:
-            last = merged[-1]
-            merged[-1] = (last[0], max(last[1], s[1]), last[2], last[3])
-        else:
-            merged.append(s)
-    return merged
+    spans += ai_code_spans(text, kind)
+    return merge_spans(spans)
 
 
 def apply(text, spans):
@@ -321,8 +512,11 @@ class Events(HTMLParser):
 
 
 def signature(text, kind, ext):
-    """Ce qui doit rester identique : code hors commentaires, commentaires conservés, flux HTML."""
+    """Ce qui doit rester identique : code hors commentaires, commentaires conservés, flux HTML.
+    Les retraits d'IA volontaires (attributs de traçage, scripts injectés, badges, tagger) sont
+    normalisés des deux côtés avant comparaison : la preuve vérifie que rien d'autre n'a changé."""
     t = drop_invisible(text, zones(text, kind))[0]
+    t = apply(t, merge_spans(ai_code_spans(t, kind)))
     if kind == "html":
         t = META_RE.sub(lambda m: "" if ai_meta(m.group(0)) else m.group(0), t)
     if kind in ("md", "txt"):
@@ -348,8 +542,13 @@ def signature(text, kind, ext):
 
 def flags(text, kind):
     out, seen = [], set()
-    if kind == "md":
+    inline = {}
+    if kind == "md":  # une mention entre `backticks` documente le motif, ce n'est pas une trace
         seen |= {n for a, b in fenced(text) for n in range(text.count("\n", 0, a) + 1, text.count("\n", 0, b) + 2)}
+        for n, line in enumerate(text.splitlines(), 1):
+            spans = [m.span() for m in INLINE_CODE.finditer(line)]
+            if spans:
+                inline[n] = spans
     for start, _, body, _ in comments(text, kind):
         if is_trace(body):
             n = text.count("\n", 0, start) + 1
@@ -360,7 +559,7 @@ def flags(text, kind):
             continue
         for check, rx, why in FLAGS:
             m = rx.search(line)
-            if m:
+            if m and not any(a <= m.start() < b for a, b in inline.get(n, ())):
                 out.append((n, check, f"« {m.group(0)[:60]} » — {why}"))
                 break
         if any(c in BIDI for c in line):
@@ -396,6 +595,12 @@ def analyze_file(path):
     new = apply(visible, spans)
     removed = [(visible.count("\n", 0, s) + 1, what, extract) for s, _, what, extract in spans]
     removed += [(n, "invisible", cp) for n, cp in inv]
+    pkg = False
+    if path.name == "package.json":
+        new2, deps, pkg_ok = clean_pkg_json(new)
+        if deps and pkg_ok:  # preuve déjà faite : JSON final == original moins ces clés
+            new, pkg = new2, True
+            removed += [(0, "dépendance de marquage", d) for d in deps]
     found = flags(new, kind)
     by_line = {}
     for n, cp in kept:
@@ -403,7 +608,7 @@ def analyze_file(path):
     found += [(n, "invisible", f"invisible(s) {', '.join(sorted(cps))} laissé(s) dans du code ou une chaîne : "
                                "à retirer à la main s'il n'est pas voulu")
               for n, cps in sorted(by_line.items())]
-    proof = new == text or signature(text, kind, ext) == signature(new, kind, ext)
+    proof = pkg or new == text or signature(text, kind, ext) == signature(new, kind, ext)
     return text, new, sorted(removed), found, proof
 
 
@@ -470,8 +675,9 @@ def render(res, date, dry):
              f"{res['scanned']} fichier(s) lus, {removed} trace(s) retirée(s){' (simulation)' if dry else ''}, "
              f"{flagged} à vérifier, {len(res['refused'])} refusé(s) par la preuve.", "",
              "Retiré : commentaires de signature, `<meta name=\"generator\">` d'outil IA, pieds de page « Generated "
-             "with », caractères invisibles de filigrane. Le code, les attributs et le texte affiché sont prouvés "
-             "identiques avant/après ; sinon le fichier n'est pas touché.", ""]
+             "with », attributs de traçage (data-lov-*, data-component-*), scripts et badges injectés, plugin de "
+             "marquage (lovable-tagger) et sa dépendance, caractères invisibles de filigrane. Le code et le texte "
+             "affiché sont prouvés identiques avant/après ; sinon le fichier n'est pas touché.", ""]
     done = [f for f in res["files"] if f["removed"]]
     if done:
         lines += ["## Retiré", "", "| Fichier | Ligne | Type | Extrait |", "|---|---|---|---|"]

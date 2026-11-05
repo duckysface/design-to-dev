@@ -51,6 +51,7 @@ Usage :
 Outils (lecture seule, sans agent) :
   npx design-to-dev scan <dossier> [--out f.json]       intention, écrans/démos existants, contrat backend
   npx design-to-dev inventory <dossier> [--out f.json]  inventaire des fichiers (refs, doublons, signaux)
+  npx design-to-dev dedupe <dossier> [--out f.json]     analyse les doublons et propose des fusions sûres
   npx design-to-dev foundations <dossier> [--strict] [--online]   fondations ✅/⚠️/❌ → docs/security/fondations.md
   npx design-to-dev deps <dossier> [--online]   failles connues, versions stables, fin de support → docs/security/dependances.md
   npx design-to-dev security-kit list [<dossier>]        skills de sécurité proposées (versions épinglées)
@@ -244,6 +245,7 @@ const PY_TOOLS = {
   scan: ["detect_project.py", "scan"],
   skills: ["detect_project.py", "skills"],
   inventory: ["organize.py", "inventory"],
+  dedupe: ["organize.py", "dedupe"],
   foundations: ["security_check.py", "foundations"],
   deps: ["security_check.py", "deps"],
   security: ["security_check.py", "scan"],

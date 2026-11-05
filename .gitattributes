@@ -1,0 +1,10 @@
+# Normalisation des fins de ligne : le hook mémoire installé est écrit en LF,
+# les scripts shell doivent rester exécutables partout.
+* text=auto
+*.py text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

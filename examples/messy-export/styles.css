@@ -1,0 +1,14 @@
+/* Design tokens — source of truth for colors */
+:root {
+  --color-primary: #5b4bd6;
+  --color-bg: #0f1117;
+  --color-surface: #1a1d27;
+  --radius-md: 10px;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  border-radius: var(--radius-md);
+  color: #fff;
+  padding: 0.6rem 1.2rem;
+}

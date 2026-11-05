@@ -4,6 +4,7 @@
 Le dossier source n'est jamais modifié : `apply` copie vers une cible neuve.
 
   organize.py inventory <source> [--out inventory.json]
+  organize.py dedupe <source> [--out merge-actions.json]
   organize.py plan-check <plan.json> [--inventory inventory.json]
   organize.py apply <plan.json> [--apply] [--force]
   organize.py verify <dossier>
@@ -55,6 +56,7 @@ KINDS = {
 EXT_KIND = {e: k for k, exts in KINDS.items() for e in exts}
 
 BACKUP_RE = re.compile(r"( copy\b|\(\d+\)|[-_ ](old|bak|backup)\b|\.bak$|\.orig$|final[-_ ]?final|~$)", re.I)
+COPY_RE = re.compile(r"( copy\b|[-_ ]copy$|\(\d+\)|[-_ ]\d+$)", re.I)
 HASH_RE = re.compile(r"^[0-9a-f]{16,}$", re.I)
 PASTED_RE = re.compile(r"^(pasted-|screenshot|screen shot|capture d.?[ée]cran|image ?\(\d+\)|img_\d+)", re.I)
 PERSONAL_RE = re.compile(r"(^|[-_ ])(pp|profile|photo|selfie|portrait|passport|passeport|id[-_ ]?card|cni)([-_ .]|$)", re.I)
@@ -169,6 +171,56 @@ def scan_refs(files, rel, data, loaders=()):
             refs.append({"raw": raw, "kind": name, "span": [s, e], "resolved": target,
                          "base": base, "suffix": suffix})
     return refs
+
+
+# --------------------------------------------------------------------------- quasi-doublons
+
+NEAR_DUP_EXT = KINDS["code"] | KINDS["style"] | KINDS["markup"] | {".md", ".mdx", ".svg", ".json"}
+NEAR_DUP_MAX = 512 * 1024
+WS_RE = re.compile(r"\s+")
+
+
+def strip_comments_light(text, ext):
+    """Retire les commentaires (chaînes préservées) pour comparer deux fichiers au contenu près."""
+    out, i, n = [], 0, len(text)
+    c_like = ext not in (".py", ".sh", ".yaml", ".yml", ".toml")
+    hash_like = ext in (".py", ".sh", ".yaml", ".yml", ".toml")
+    while i < n:
+        ch = text[i]
+        if ch in "'\"" or (ch == "`" and c_like):
+            j = i + 1
+            while j < n and text[j] != ch and not (text[j] == "\n" and ch != "`"):
+                j += 2 if text[j] == "\\" else 1
+            out.append(text[i:j + 1])
+            i = j + 1
+        elif c_like and text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        elif c_like and text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif hash_like and ch == "#":
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif ext in (".html", ".htm", ".svg", ".md", ".mdx") and text.startswith("<!--", i):
+            j = text.find("-->", i + 4)
+            i = n if j < 0 else j + 3
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
+def norm_hash(text, ext):
+    """Empreinte « au contenu près » : commentaires et espaces ignorés. Deux variantes d'un même
+    fichier (copie retouchée, signature d'outil en commentaire) partagent cette empreinte."""
+    if ext == ".json":
+        try:
+            return hashlib.sha1(json.dumps(json.loads(text), sort_keys=True).encode()).hexdigest()
+        except ValueError:
+            pass
+    return hashlib.sha1(WS_RE.sub("", strip_comments_light(text, ext)).encode("utf-8",
+                                                                               errors="ignore")).hexdigest()
 
 
 # --------------------------------------------------------------------------- inventaire
@@ -296,6 +348,22 @@ def build_inventory(source):
             for pth in paths:
                 entries[pth]["signals"].append("duplicate")
                 entries[pth]["duplicates"] = [x for x in paths if x != pth]
+
+    # Quasi-doublons : même contenu aux commentaires et espaces près, mais octets différents.
+    # Jamais un signal de suppression automatique : deux variantes peuvent servir des écrans
+    # différents (un bouton lié ici, sa variante liée là) — la fusion se décide avec l'utilisateur.
+    by_norm = defaultdict(list)
+    for rel, data in texts.items():
+        ext = posixpath.splitext(rel)[1].lower()
+        if ext in NEAR_DUP_EXT and len(data) <= NEAR_DUP_MAX and len(entries[rel]["sha1"]) > 0:
+            entries[rel]["norm_sha1"] = norm_hash(data, ext)
+            by_norm[entries[rel]["norm_sha1"]].append(rel)
+    for paths in by_norm.values():
+        exact = {entries[p]["sha1"] for p in paths}
+        if len(paths) > 1 and len(exact) > 1:
+            for pth in paths:
+                entries[pth]["signals"].append("near-duplicate")
+                entries[pth]["similar_to"] = sorted(x for x in paths if x != pth)
 
     for rel, e in entries.items():
         e["refs_out"] = refs.get(rel, [])
@@ -458,7 +526,9 @@ def check_plan(plan, inv):
             continue
         a = resolved[p]
         rb = a.get("replaced_by")
-        if rb and mapping.get(rb) is None:
+        if rb and rb not in inv["files"]:
+            errors.append(f"{p} remplacé par {rb}, qui n'existe pas dans la source")
+        elif rb and mapping.get(rb) is None:
             errors.append(f"{p} remplacé par {rb}, qui n'est pas conservé")
         live = [r for r in inv["files"][p]["refs_in"] if mapping.get(r) is not None]
         strong = [r for r in live if any(o["resolved"] == p and o["kind"] in STRONG
@@ -467,6 +537,16 @@ def check_plan(plan, inv):
             errors.append(f"suppression d'un fichier utilisé : {p} (référencé par {', '.join(strong[:3])})")
         elif live and not rb:
             warnings.append(f"{p} est seulement mentionné par {', '.join(live[:3])} : mettre ce texte à jour")
+        # Un quasi-doublon n'est jamais une simple copie : deux variantes proches peuvent porter
+        # des écrans différents. Sans remplaçant, sa suppression exige une décision explicite.
+        if "near-duplicate" in inv["files"][p].get("signals", []) and not rb and not a.get("review"):
+            errors.append(f"quasi-doublon supprimé sans fusion ni revue : {p} — choisir la variante "
+                          f"canonique (replaced_by) ou marquer review pour décider avec l'utilisateur")
+        if "duplicate" in inv["files"][p].get("signals", []) and not rb:
+            kept_copies = [d for d in inv["files"][p].get("duplicates", []) if mapping.get(d) is not None]
+            if kept_copies and (live or strong):
+                errors.append(f"doublon exact supprimé sans replaced_by : {p} — poser replaced_by vers "
+                              f"{kept_copies[0]} pour que ses références soient réécrites")
     reviews = [p for p, a in resolved.items() if a.get("review")]
     return errors, warnings, reviews, mapping, resolved
 
@@ -628,6 +708,86 @@ def apply_plan(plan_path, do_apply, force):
         print(f"{len(all_broken)} référence(s) vers des fichiers supprimés — voir le rapport.")
 
 
+# --------------------------------------------------------------------------- déduplication
+
+def pick_canonical(group, files):
+    """La copie qui survit à la fusion : la plus référencée, au nom propre, au chemin le plus court."""
+    def score(p):
+        stem = posixpath.splitext(posixpath.basename(p))[0]
+        messy = bool(BACKUP_RE.search(stem) or COPY_RE.search(stem) or PASTED_RE.match(stem))
+        return (-len(files[p]["refs_in"]), messy, len(p), p)
+    return sorted(group, key=score)[0]
+
+
+def dedupe(inv):
+    """Propose des actions de plan pour les groupes de doublons, sans jamais décider seul quand
+    le contenu diffère : doublon exact → fusion (delete + replaced_by, références réécrites par
+    apply) ; quasi-doublon → review, la variante à garder se choisit avec l'utilisateur."""
+    files = inv["files"]
+    actions, groups_out = [], []
+    by_hash, by_norm = defaultdict(list), defaultdict(list)
+    for p, e in files.items():
+        if p.endswith("/"):
+            continue
+        if "duplicate" in e["signals"]:
+            by_hash[e["sha1"]].append(p)
+        if "near-duplicate" in e["signals"]:
+            by_norm[e["norm_sha1"]].append(p)
+    for group in by_hash.values():
+        canonical = pick_canonical(group, files)
+        others = [p for p in group if p != canonical]
+        groups_out.append({"type": "exact", "canonical": canonical, "copies": others})
+        for p in others:
+            refs = files[p]["refs_in"]
+            actions.append({"src": p, "action": "delete", "replaced_by": canonical,
+                            "reason": f"doublon exact de {canonical} (même empreinte) — "
+                                      f"{len(refs)} référence(s) seront réécrites vers le fichier canonique",
+                            "confidence": 1.0 if not refs else 0.95, "agent": "code"})
+    handled = {a["src"] for a in actions}
+    for group in by_norm.values():
+        exact = {files[p]["sha1"] for p in group}
+        if len(exact) <= 1:
+            continue  # déjà couvert par le groupe exact
+        canonical = pick_canonical(group, files)
+        others = [p for p in group if p != canonical and p not in handled]
+        if not others:
+            continue
+        groups_out.append({"type": "near", "canonical": canonical, "copies": others})
+        for p in others:
+            refs = files[p]["refs_in"]
+            actions.append({"src": p, "action": "keep", "review": True,
+                            "reason": f"quasi-doublon de {canonical} (même contenu aux commentaires et "
+                                      f"espaces près) — vérifier que les deux variantes ne servent pas des "
+                                      f"écrans différents ; pour fusionner : delete + replaced_by "
+                                      f"({len(refs)} référence(s) à réécrire)",
+                            "confidence": 0.5, "agent": "code"})
+    return actions, groups_out
+
+
+def run_dedupe(source, out):
+    inv = build_inventory(source)
+    actions, groups = dedupe(inv)
+    files = inv["files"]
+    if not groups:
+        print("Aucun doublon détecté.")
+    for g in groups:
+        label = "doublons exacts" if g["type"] == "exact" else "quasi-doublons"
+        print(f"\n{label} — canonique : {g['canonical']}")
+        for p in g["copies"]:
+            refs = files[p]["refs_in"]
+            via = f"référencé par {', '.join(refs[:3])}" if refs else "non référencé"
+            decision = "fusion proposée" if g["type"] == "exact" else "à trancher (revue)"
+            print(f"  {'=' if g['type'] == 'exact' else '~'}> {p}  ({via} → {decision})")
+    payload = {"source": inv["source"], "actions": actions}
+    if out:
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        Path(out).write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"\nActions écrites : {out} — à intégrer dans plan.json (champ actions).")
+    else:
+        print("\n" + json.dumps(payload, ensure_ascii=False, indent=1))
+    return 0
+
+
 # --------------------------------------------------------------------------- vérification
 
 def verify(folder):
@@ -662,6 +822,10 @@ def main():
     a = sub.add_parser("inventory")
     a.add_argument("source")
     a.add_argument("--out")
+    d = sub.add_parser("dedupe", help="analyse les doublons et propose des fusions (aucune écriture "
+                                    "dans la source)")
+    d.add_argument("source")
+    d.add_argument("--out")
     b = sub.add_parser("plan-check")
     b.add_argument("plan")
     b.add_argument("--inventory")
@@ -682,6 +846,10 @@ def main():
             Path(args.out).write_text(json.dumps(inv, ensure_ascii=False, indent=1), encoding="utf-8")
             print(f"Inventaire écrit : {args.out}\n")
         print_summary(inv)
+    elif args.cmd == "dedupe":
+        if args.out and Path(args.out).resolve().is_relative_to(Path(args.source).resolve()):
+            sys.exit("--out doit être en dehors du dossier source (la source n'est jamais modifiée).")
+        sys.exit(run_dedupe(args.source, args.out))
     elif args.cmd == "plan-check":
         plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
         inv = (json.loads(Path(args.inventory).read_text(encoding="utf-8")) if args.inventory

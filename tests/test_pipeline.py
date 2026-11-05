@@ -516,7 +516,15 @@ class AITracesTest(Base):
     TSX = ("// {gen} v0\nconst url = \"https://example.com\"; // made with Copilot\nexport const A = () => (\n"
            "  <div>\n    {{/* Created with Lovable */}}\n    <p data-lov-id=\"x\">hi</p>\n  </div>\n);\n/* keep */\n"
            "const s = '// {gen} Claude';\nconst t = 1; /* {gen} Claude */ const u = 2;\n")
-    MD = ("# T\n\nText\n\n\U0001F916 Generated with [Claude Code](https://claude.com/claude-code)\n\n"
+    VITE = ("import { defineConfig } from \"vite\";\nimport react from \"@vitejs/plugin-react\";\n"
+            "import { componentTagger } from \"lovable-tagger\";\n\nexport default defineConfig({\n"
+            "  plugins: [react(), componentTagger()],\n});\n")
+    PKG = ('{\n  "name": "app",\n  "dependencies": {\n    "react": "^18.3.1",\n    "lovable-tagger": "^1.1.7"\n'
+           '  },\n  "devDependencies": {\n    "vite": "^5.4.0"\n  }\n}\n')
+    MD = ("# T\n\nText\n\nThis project was built with [Lovable](https://lovable.dev).\n\n"
+          "## Build with Lovable\n\nContinue developing in the [Lovable editor](https://lovable.dev/projects/x).\n"
+          "- Ship faster: describe what you want.\n\n## Development\n\n```sh\nnpm run dev\n```\n\n"
+          "\U0001F916 Generated with [Claude Code](https://claude.com/claude-code)\n\n"
           "Co-" + "Authored-By: Claude Opus <noreply@anthropic.com>\n\n```\nCo-" + "Authored-By: Claude <x@y>\n```\n")
 
     def setUp(self):
@@ -524,6 +532,8 @@ class AITracesTest(Base):
         self.root = self.tmp / "proj"
         write(self.root, "index.html", self.HTML.format(gen=self.GEN))
         write(self.root, "app.tsx", self.TSX.format(gen=self.GEN))
+        write(self.root, "vite.config.ts", self.VITE)
+        write(self.root, "package.json", self.PKG)
         write(self.root, "README.md", self.MD)
         write(self.root, ".claude/x.md", f"<!-- {self.GEN} Claude -->\n")
 
@@ -548,21 +558,38 @@ class AITracesTest(Base):
         self.assertIn("a\u00a0:", html)                        # espace insécable intact
         self.assertIn("\U0001F3F4\U000E0067", html)            # drapeau intact
         self.assertIn("xy</p>", html)                          # tag isolé retiré
-        self.assertIn("Edit with Lovable", html)               # badge : seulement signalé
+        self.assertNotIn("Edit with Lovable", html)            # badge : retiré (lien + texte de badge)
+        self.assertNotIn("gptengineer", html)                  # script injecté : retiré
         tsx = self.read("app.tsx")
         self.assertTrue(tsx.startswith('const url = "https://example.com";\n'))
         self.assertNotIn("Lovable", tsx)
-        self.assertIn("<div>\n    <p data-lov-id", tsx)
+        self.assertNotIn("data-lov-id", tsx)                   # attribut de traçage : retiré
+        self.assertIn("<p>hi</p>", tsx)
         self.assertIn(f"const s = '// {self.GEN} Claude';", tsx)  # chaîne jamais touchée
         self.assertIn("/* keep */", tsx)
-        self.assertEqual(self.read("README.md"), "# T\n\nText\n\n```\nCo-" + "Authored-By: Claude <x@y>\n```\n")
+        vite = self.read("vite.config.ts")
+        self.assertNotIn("lovable-tagger", vite)               # import du tagger : retiré
+        self.assertNotIn("componentTagger", vite)              # appel : retiré, virgule gérée
+        self.assertIn("plugins: [react()]", vite)
+        pkg = json.loads(self.read("package.json"))
+        self.assertEqual(pkg["dependencies"], {"react": "^18.3.1"})
+        self.assertIn("vite", pkg["devDependencies"])
+        readme = self.read("README.md")
+        self.assertNotIn("Lovable", readme)                    # ligne « built with » + section boilerplate
+        self.assertNotIn("Generated with", readme)
+        self.assertEqual(readme, "# T\n\nText\n\n## Development\n\n```sh\nnpm run dev\n```\n\n```\nCo-"
+                                 + "Authored-By: Claude <x@y>\n```\n")
         self.assertIn(self.GEN, self.read(".claude/x.md"))     # config d'agent ignorée
         flagged = " ".join(i["text"] for i in data["items"])
-        for hint in ("Edit with Lovable", "cdn.gpteng.co", "data-lov-id", "app.tsx:9"):
-            self.assertIn(hint, flagged)
+        self.assertIn("app.tsx:9", flagged)                    # trace mêlée au code : toujours signalée
+        self.assertNotIn("Edit with Lovable", flagged)         # retiré, plus signalé
+        self.assertNotIn("data-lov-id", flagged)
         self.assertNotIn("README.md", flagged)                 # bloc de code : ni retiré ni signalé
         report = self.read("docs/cleanup/traces-ia.md")
         self.assertIn("## Retiré", report)
+        self.assertIn("attribut de traçage", report)
+        self.assertIn("script injecté", report)
+        self.assertIn("dépendance de marquage", report)
         self.assertIn("## À vérifier", report)
 
     def test_invisible_in_code_string_is_kept_and_flagged(self):
@@ -603,6 +630,85 @@ class AITracesTest(Base):
         self.assertIn("trace(s) d'IA", warn)
         self.assertIn("U+E0041", warn)
         self.assertEqual(warn.count("U+200B"), 1)              # pas répété par ai-trace
+
+
+class DedupeTest(Base):
+    """Doublons : analyse d'abord, jamais de suppression directe. Doublon exact → fusion avec
+    références réécrites ; quasi-doublon → revue, car deux variantes proches peuvent porter
+    des écrans différents."""
+    ORGANIZE = SKILL / "scripts" / "organize.py"
+    BUTTON = "// note\nexport const Button = () => <button className=\"btn\">OK</button>;\n"
+
+    def setUp(self):
+        super().setUp()
+        self.src = self.tmp / "design"
+        write(self.src, "Button.jsx", self.BUTTON)
+        write(self.src, "Button (copy).jsx", self.BUTTON)                       # doublon exact
+        write(self.src, "ButtonAlt.jsx",                                       # quasi-doublon (commentaire près)
+              "// autre commentaire\nexport const Button = () => <button className=\"btn\">OK</button>;\n")
+        write(self.src, "screen1.html", '<script type="module" src="./Button.jsx"></script>\n')
+        write(self.src, "screen2.html", '<script type="module" src="./Button (copy).jsx"></script>\n')
+        write(self.src, "screen3.html", '<script type="module" src="./ButtonAlt.jsx"></script>\n')
+
+    def plan(self, actions):
+        p = self.tmp / "plan.json"
+        p.write_text(json.dumps({"source": str(self.src), "target": str(self.tmp / "out"),
+                                 "actions": actions}), encoding="utf-8")
+        return p
+
+    def test_dedupe_merges_exact_duplicates_and_reviews_near_ones(self):
+        out = self.tmp / "merge.json"
+        r = run([self.ORGANIZE, "dedupe", self.src, "--out", out])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        actions = {a["src"]: a for a in json.loads(out.read_text(encoding="utf-8"))["actions"]}
+        merge = actions["Button (copy).jsx"]
+        self.assertEqual(merge["action"], "delete")
+        self.assertEqual(merge["replaced_by"], "Button.jsx")     # le plus référencé est canonique
+        self.assertNotIn("review", merge)                        # fusion sûre : pas de blocage
+        near = actions["ButtonAlt.jsx"]
+        self.assertEqual(near["action"], "keep")                 # jamais supprimé d'office
+        self.assertTrue(near["review"])                          # la variante se choisit ensemble
+        self.assertNotIn("Button.jsx", actions)                  # le canonique n'a pas d'action
+
+    def test_plan_check_blocks_blind_duplicate_deletion(self):
+        keep = lambda p: {"src": p, "action": "keep", "reason": "test"}
+        r = run([self.ORGANIZE, "plan-check", self.plan([
+            keep("Button.jsx"), keep("screen1.html"), keep("screen2.html"), keep("screen3.html"),
+            {"src": "Button (copy).jsx", "action": "delete", "reason": "doublon"},
+            {"src": "ButtonAlt.jsx", "action": "delete", "reason": "quasi doublon"},
+        ])])
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("replaced_by", r.stdout)                   # la fusion est exigée
+        self.assertIn("revue", r.stdout)                         # ou une décision explicite
+
+    def test_apply_merge_rewrites_references(self):
+        r = run([self.ORGANIZE, "apply", self.plan([
+            {"src": "Button.jsx", "action": "move", "dst": "src/components/Button.jsx", "reason": "canonique"},
+            {"src": "Button (copy).jsx", "action": "delete", "replaced_by": "Button.jsx",
+             "reason": "doublon exact"},
+            {"src": "ButtonAlt.jsx", "action": "move", "dst": "src/components/ButtonAlt.jsx",
+             "reason": "variante distincte conservée"},
+            {"src": "screen1.html", "action": "move", "dst": "prototypes/screen1.html", "reason": "écran"},
+            {"src": "screen2.html", "action": "move", "dst": "prototypes/screen2.html", "reason": "écran"},
+            {"src": "screen3.html", "action": "move", "dst": "prototypes/screen3.html", "reason": "écran"},
+        ]), "--apply"])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = self.tmp / "out"
+        self.assertFalse((out / "src" / "components" / "Button (copy).jsx").exists())
+        screen2 = (out / "prototypes" / "screen2.html").read_text(encoding="utf-8")
+        self.assertIn("../src/components/Button.jsx", screen2)   # fusion : référence réécrite
+        self.assertTrue((self.src / "Button (copy).jsx").exists())  # source jamais touchée
+        v = run([self.ORGANIZE, "verify", out])
+        self.assertEqual(v.returncode, 0, v.stdout + v.stderr)
+
+    def test_near_duplicate_signal_in_inventory(self):
+        out = self.tmp / "inv.json"
+        r = run([self.ORGANIZE, "inventory", self.src, "--out", out])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        files = json.loads(out.read_text(encoding="utf-8"))["files"]
+        self.assertIn("duplicate", files["Button (copy).jsx"]["signals"])
+        self.assertIn("near-duplicate", files["ButtonAlt.jsx"]["signals"])
+        self.assertIn("Button.jsx", files["ButtonAlt.jsx"]["similar_to"])
 
 
 if __name__ == "__main__":

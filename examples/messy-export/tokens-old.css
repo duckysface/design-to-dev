@@ -1,0 +1,5 @@
+/* legacy palette — superseded by styles.css */
+:root {
+  --primary: blue;
+  --background: white;
+}

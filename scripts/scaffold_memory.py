@@ -587,7 +587,9 @@ def check(project):
             problems.append(f"manquant : {rel}")
         elif sha(p.read_bytes()) != digest:
             problems.append(f"modifié depuis l'installation : {rel}")
-    tpl = sha((TPL / "hooks" / "memory_hook.py").read_bytes())
+    # Compare en texte normalisé (LF) : le hook installé est toujours écrit en LF, alors que le
+    # modèle peut être checké out en CRLF selon le core.autocrlf de la machine.
+    tpl = sha((TPL / "hooks" / "memory_hook.py").read_text(encoding="utf-8"))
     if m.get("files", {}).get(HOOK_REL) not in (None, tpl):
         problems.append(f"une version plus récente de {HOOK_REL} est disponible (--update)")
     for rel in m.get("blocks", []):
