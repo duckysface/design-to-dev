@@ -13,6 +13,8 @@ import os
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -446,11 +448,37 @@ def resolve_out(root, out, default):
     return out if out.is_absolute() else Path.cwd() / out
 
 
-def prepare(target, out, default):
+DESIGN_EXPORT_MARKERS = ("_ds_manifest.json", "_ds_bundle.js", "_adherence.oxlintrc.json",
+                         ".bolt", ".lovable", ".replit")
+
+
+def looks_like_design_export(root):
+    """Un export de design brut est une SOURCE : la règle absolue est qu'elle n'est jamais modifiée.
+    Les rapports y sont donc redirigés hors du dossier, sauf --out explicite ou --write.
+    Est protégé : un dossier avec marqueur d'outil de design qui n'est ni versionné (.git) ni déjà
+    doté de la mémoire (.agents/memory) — un projet suivi ou préparé reçoit ses rapports normalement."""
+    if not any((root / m).exists() for m in DESIGN_EXPORT_MARKERS):
+        return False
+    return not (root / ".git").exists() and not (root / ".agents" / "memory").exists()
+
+
+def guard_source(root, out, default, force_write):
+    """(chemin de sortie, avertissement ou None). Si la cible est un export de design et qu'aucun
+    --out n'a été donné, le rapport part dans un dossier temporaire au lieu de polluer la source."""
+    if force_write or out is not None or not looks_like_design_export(root):
+        return resolve_out(root, out, default), None
+    tmp = Path(tempfile.mkdtemp(prefix="design-to-dev-")) / default
+    return tmp, ("export de design détecté : la source n'est jamais modifiée — rapport(s) écrit(s) "
+                 f"sous {tmp.parent} (utiliser --out <chemin> ou --write pour choisir)")
+
+
+def prepare(target, out, default, force_write=False):
     root = Path(target).resolve()
     if not root.is_dir():
         raise SystemExit(f"Dossier introuvable : {root}")
-    out = resolve_out(root, out, default)
+    out, warn = guard_source(root, out, default, force_write)
+    if warn:
+        print(f"⚠ {warn}", file=sys.stderr)
     skip = {out.resolve().relative_to(root).as_posix()} if out.resolve().is_relative_to(root) else set()
     skip |= {"docs/security/fondations.md", "docs/security/dependances.md", "docs/security/kit-securite.md"}
     skip |= kit_trusted(root)
@@ -478,9 +506,9 @@ def deps_summary(deps, res, dest):
             "errors": res["errors"] + res["net_errors"]}
 
 
-def run_deps(target, out, online, as_json, strict, version_str):
+def run_deps(target, out, online, as_json, strict, version_str, force_write=False):
     """`security_check.py deps` : inventaire, failles connues, versions stables et support des dépendances."""
-    root, dest, skip, files = prepare(target, out, "docs/security/dependances.md")
+    root, dest, skip, files = prepare(target, out, "docs/security/dependances.md", force_write)
     rep = Report()
     check_cdn(rep, load_libs()[1], files, root)
     deps, res = deps_report(root, dest, skip, files, rep, online, version_str, time.strftime("%Y-%m-%d"))
@@ -501,8 +529,8 @@ def run_deps(target, out, online, as_json, strict, version_str):
     return 1 if strict and summary["block"] else 0
 
 
-def run(target, out, strict, run_audits, as_json, collect, version_str, online=False):
-    root, out, skip, files = prepare(target, out, "docs/security/fondations.md")
+def run(target, out, strict, run_audits, as_json, collect, version_str, online=False, force_write=False):
+    root, out, skip, files = prepare(target, out, "docs/security/fondations.md", force_write)
     libs_date, index = load_libs()
     rep = Report()
     check_cdn(rep, index, files, root)
@@ -514,7 +542,7 @@ def run(target, out, strict, run_audits, as_json, collect, version_str, online=F
     check_ai_traces(rep, root)
     from_scan(rep, collect(root))
     date = time.strftime("%Y-%m-%d")
-    dest = root / "docs" / "security" / "dependances.md"
+    dest = out.parent / "dependances.md"  # suit la sortie (y compris hors source protégée)
     deps, res = deps_report(root, dest, skip, files, rep, online, version_str, date)
     for level, check, text in deps.items(res):
         rep.add(level, check, text)

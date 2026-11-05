@@ -91,7 +91,31 @@ FORM_RE = re.compile(r"<form\b", re.I)
 INPUT_RE = re.compile(r"<(?:input|Input|TextField|textarea|select)\b([^>]*)>", re.S)
 ATTR_RE = {a: re.compile(a + r"""\s*=\s*["'{]([^"'}]+)""", re.I) for a in ("type", "name", "id", "placeholder")}
 TH_RE = re.compile(r"<th\b[^>]*>(.*?)</th>", re.I | re.S)
-FETCH_RE = re.compile(r"""\b(?:fetch|axios\.(?:get|post|put|patch|delete)|\$fetch|useQuery|createQuery)\s*\(\s*[`"']?([^`"',)\s]*)""")
+FETCH_RE = re.compile(r"""\b(fetch|axios\.(get|post|put|patch|delete)|\$fetch|useQuery|createQuery)\s*\(\s*[`"']([^`"',]+)""", re.I)
+ASSET_RE = re.compile(r"\.(?:css|js|mjs|jsx|tsx|png|jpe?g|gif|svg|webp|avif|woff2?|ico|mp4|webm|pdf)(?:[?#]|$)", re.I)
+
+
+def api_call(text, m):
+    """« GET /api/clients » — méthode lue dans l'appel (axios.post, method: 'POST'), GET sinon."""
+    fn = m.group(1).lower()
+    url = m.group(3).strip()
+    if fn.startswith("axios."):
+        method = m.group(2).upper()
+    elif fn in ("usequery", "createquery"):
+        method = "GET"
+    else:
+        mm = re.search(r"""\bmethod\s*:\s*['"]([A-Za-z]+)""", text[m.end():m.end() + 200])
+        method = mm.group(1).upper() if mm else "GET"
+    return f"{method} {url}"
+
+
+def call_url(call):
+    return call.split(" ", 1)[1]
+
+
+def is_api_call(call):
+    url = call_url(call)
+    return (url.startswith(("/", "http")) or "api" in url) and not ASSET_RE.search(url)
 # nom explicitement factice, ou nom d'entité seulement s'il est suivi d'un tableau d'objets (`users = [{`)
 MOCK_RE = re.compile(r"""\b(?:const|let|var)\s+(\w*(?:mock|fake|sample|dummy|demo|seed|fixture|placeholder)\w*|"""
                      r"""\w*(?:users|orders|products|clients|customers|rows|transactions|invoices)\w*"""
@@ -158,9 +182,13 @@ def analyse_screen(rel, text):
         if label:
             fields.append({"name": clean(label, 40), "type": (field["type"] or "text").lower()})
     columns = [c for c in (clean(h, 40) for h in TH_RE.findall(text)) if c]
-    calls = [u for u in FETCH_RE.findall(text) if u]
+    calls = []
+    for m in FETCH_RE.finditer(text):
+        c = api_call(text, m)
+        if c not in calls and not ASSET_RE.search(call_url(c)):
+            calls.append(c)
     mocks = sorted(set(MOCK_RE.findall(text)))
-    status = "wired" if any(u.startswith(("/", "http")) or "api" in u for u in calls) else \
+    status = "wired" if any(is_api_call(c) for c in calls) else \
         "mock-data" if mocks else "static"
     return {
         "path": rel,
@@ -174,6 +202,55 @@ def analyse_screen(rel, text):
         "mock_data": mocks[:20],
         "status": status,
     }
+
+
+# --------------------------------------------------------------------------- doublons d'écrans
+
+# suffixes de copie (« screen-1-final », « clients copie 2 », « login-v3 »…)
+DUP_SUFFIX_RE = re.compile(r"(?:[-_ ]+(?:final|finale?|copy|copie|new|nouveau|v\d+|bis|ter|\(\d+\)))+$", re.I)
+STATUS_RANK = {"wired": 0, "mock-data": 1, "static": 2}
+KIND_RANK = {"page": 0, "demo": 1, "fragment": 2, "component": 3}
+
+
+def base_name(title):
+    return DUP_SUFFIX_RE.sub("", title.lower()).strip(" -_") or title.lower()
+
+
+def screen_fingerprint(s):
+    """Structure de l'écran : deux empreintes égales + même nom de base = même écran copié."""
+    fields = tuple(sorted((f["name"], f["type"]) for f in s["fields"]))
+    return (tuple(s["features"]), tuple(c.lower() for c in s["table_columns"]), fields, s["forms"])
+
+
+def merge_duplicate_screens(screens):
+    """Fusionne les copies d'un même écran (screen-1, screen-1-final…) : une seule entrée au nom
+    propre, les autres chemins dans `duplicates`. Analyse seulement — aucun fichier n'est touché.
+    Deux écrans ne fusionnent que si nom de base ET structure (fonctionnalités, colonnes, champs)
+    sont identiques : deux pages différentes qui se ressemblent restent deux entrées."""
+    groups, order = {}, []
+    for s in screens:
+        key = (base_name(s["title"]), screen_fingerprint(s))
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(s)
+    merged = []
+    for key in order:
+        copies = groups[key]
+        if len(copies) == 1:
+            merged.append(copies[0])
+            continue
+        canon = min(copies, key=lambda s: (bool(DUP_SUFFIX_RE.search(s["title"]) or
+                                                 DUP_SUFFIX_RE.search(Path(s["path"]).stem)),
+                                           KIND_RANK.get(s["kind"], 9), len(s["path"]), s["path"]))
+        canon = dict(canon)
+        others = [s for s in copies if s["path"] != canon["path"]]
+        canon["duplicates"] = sorted(s["path"] for s in others)
+        canon["api_calls"] = sorted({c for s in copies for c in s["api_calls"]})
+        canon["mock_data"] = sorted({m for s in copies for m in s["mock_data"]})
+        canon["status"] = min((s["status"] for s in copies), key=lambda st: STATUS_RANK.get(st, 3))
+        merged.append(canon)
+    return merged
 
 
 def detect_frameworks(root):
@@ -443,13 +520,23 @@ def decide(scores, screens):
     return best, secondary, ambiguous
 
 
+def entity_name(s):
+    """Nom de la ressource : l'appel réel (GET /api/clients → « clients ») prime sur le titre du fichier."""
+    for c in s["api_calls"]:
+        m = re.fullmatch(r"GET /api/([a-z0-9][a-z0-9-]*)", c)
+        if m:
+            return m.group(1)
+    return slug(s["title"])
+
+
 def backend_contract(screens):
     features = set().union(*(s["features"] for s in screens)) if screens else set()
     entities = {}
     for s in screens:
         if s["table_columns"]:
-            entities.setdefault(slug(s["title"]), {"fields": [], "from": []})
-            ent = entities[slug(s["title"])]
+            name = entity_name(s)
+            entities.setdefault(name, {"fields": [], "from": []})
+            ent = entities[name]
             ent["fields"] = sorted(set(ent["fields"]) | set(s["table_columns"]))
             ent["from"].append(s["path"])
     endpoints = []
@@ -464,6 +551,8 @@ def backend_contract(screens):
     for s in screens:
         if s["forms"] and not set(s["features"]) & {"auth", "signup"} and not s["table_columns"]:
             endpoints.append(f"POST /api/{slug(s['title'])}")
+    # appels réellement présents dans les maquettes : fetch("/api/clients") compte autant qu'un tableau
+    wired = sorted({c for s in screens for c in s["api_calls"] if call_url(c).startswith("/")})
     return {
         "auth": "auth" in features,
         "roles": ["admin", "user"] if "admin" in features and "auth" in features else [],
@@ -471,8 +560,25 @@ def backend_contract(screens):
         "uploads": "upload" in features,
         "payments": "payment" in features,
         "entities": entities,
-        "endpoints": sorted(set(endpoints)),
+        "wired_calls": wired,
+        "endpoints": sorted(set(endpoints) | set(wired)),
     }
+
+
+VITRINE_LIGHT = ("Astro + Tailwind CSS + Motion/GSAP (site statique, déployé en CDN) — pas de backend dédié ; "
+                 "îlots Svelte/React seulement pour l'interactif")
+
+
+def vitrine_stack(contract, base):
+    """Un site vitrine sans auth ni données n'a pas besoin d'un backend : formulaire de contact
+    en fonction serverless ou service de formulaires. Rust Axum seulement si vraie logique serveur."""
+    if contract["auth"] or contract["payments"] or contract["uploads"] or contract["entities"]:
+        return base
+    forms = [e for e in contract["endpoints"] if e.startswith("POST /api/")]
+    if not forms:
+        return VITRINE_LIGHT
+    return (VITRINE_LIGHT + " ; " + ", ".join(forms[:3]) + " via fonction serverless (endpoint Astro, "
+            "Vercel/Netlify) ou service de formulaires (Formspree, Web3Forms)")
 
 
 def analyse(root):
@@ -486,6 +592,7 @@ def analyse(root):
             texts[rel] = read_text(p)
         if p.suffix.lower() in UI_EXT and rel in texts:
             screens.append(analyse_screen(rel, texts[rel]))
+    screens = merge_duplicate_screens(screens)
     scores, evidence = score_intents(paths, texts)
     best, secondary, ambiguous = decide(scores, screens)
     intents = [best] + secondary if best else []
@@ -495,6 +602,14 @@ def analyse(root):
     stacks = {**STACKS, **profile["stacks"]}
     state = project_state(root)
     contract = backend_contract([s for s in screens if s["kind"] != "component"] or screens)
+
+    def recommend(i):
+        if backend and i in ("dashboard", "backend"):
+            return f"Garder {', '.join(backend)} (déjà en place) — alternative : {stacks[i]}"
+        if i == "vitrine" and i not in profile["stacks"]:
+            return vitrine_stack(contract, stacks[i])
+        return stacks[i]
+
     result = {
         "root": str(root),
         "project": state,
@@ -511,8 +626,7 @@ def analyse(root):
         },
         "stack_profile": profile["path"],
         "existing_backend": backend,
-        "recommended_stack": {i: (f"Garder {', '.join(backend)} (déjà en place) — alternative : {stacks[i]}"
-                                  if backend and i in ("dashboard", "backend") else stacks[i]) for i in intents},
+        "recommended_stack": {i: recommend(i) for i in intents},
         "screens": screens,
         "backend_contract": contract,
     }
@@ -560,10 +674,13 @@ def print_summary(r, out):
           f"{kinds.get('fragment', 0)} fragments, {kinds.get('component', 0)} composants")
     print("  état : " + (", ".join(f"{k}={v}" for k, v in status.items()) or "—"))
     for s in [s for s in r["screens"] if s["kind"] in ("page", "demo")][:15]:
-        print(f"  - [{s['kind']}] {s['path']} — {s['title']} {s['features'] or ''}")
+        dup = f" (copies fusionnées : {', '.join(s['duplicates'])})" if s.get("duplicates") else ""
+        print(f"  - [{s['kind']}] {s['path']} — {s['title']} {s['features'] or ''}{dup}")
     bc = r["backend_contract"]
     print(f"Backend à brancher : auth={bc['auth']} roles={bc['roles'] or '-'} mfa={bc['mfa']} "
           f"entités={list(bc['entities']) or '-'} ({len(bc['endpoints'])} endpoints)")
+    if bc.get("wired_calls"):
+        print("  appels réels dans les maquettes : " + ", ".join(bc["wired_calls"][:10]))
     for q in it["questions"]:
         print(f"  ? {q}")
     print(f"Prochaine étape : {r['next_step']}")

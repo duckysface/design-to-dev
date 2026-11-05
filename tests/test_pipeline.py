@@ -103,6 +103,19 @@ class FoundationsTest(Base):
         report = (root / "docs" / "security" / "fondations.md").read_text(encoding="utf-8")
         self.assertIn("✅", report)
 
+    def test_never_writes_into_a_raw_design_export(self):
+        root = self.make(bad=False)
+        write(root, "_ds_manifest.json", '{"design": true}')
+        r, data = self.foundations(root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse((root / "docs").exists())               # la source n'est jamais modifiée
+        self.assertNotEqual(Path(data["out"]).resolve().parents[1], root.resolve())
+        self.assertIn("export de design", r.stderr)
+        # --write force l'écriture (choix explicite de l'utilisateur)
+        r, _ = self.foundations(root, "--write")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((root / "docs" / "security" / "fondations.md").is_file())
+
     def test_updates_origin_and_etat(self):
         root = self.make()
         self.assertEqual(run([SCAFFOLD, root, "--agents", "cursor", "--python", PY, "--no-detect"]).returncode, 0)
@@ -218,6 +231,16 @@ class PreprodTest(Base):
         index = (mem / "MEMORY.md").read_text(encoding="utf-8")
         self.assertIn("## Origine du projet", index)
         self.assertLess(index.index("## Origine du projet"), index.index("## Résumé"))
+
+    def test_journal_can_close_the_step_in_one_call(self):
+        r = self.log("journal", "--dir", self.pre, "--step", 1, "--status", "TERMINÉ",
+                     "--next", "Lancer les sous-agents", "fait : 42 fichiers")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("fait : 42 fichiers", (self.pre / "journal.md").read_text(encoding="utf-8"))
+        etat = (self.pre / "etat.md").read_text(encoding="utf-8")
+        self.assertIn("Étape 1", etat)
+        self.assertIn("TERMINÉ", etat)
+        self.assertIn("Lancer les sous-agents", etat)
 
     def test_check_requires_every_step(self):
         self.log("journal", "--dir", self.pre, "--step", 0, "cadrage")

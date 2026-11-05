@@ -1,6 +1,6 @@
 {
   "name": "design-to-dev",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Pre-production skill for Claude Code and Codex: turns any design export (Claude Design, Figma, v0, Lovable…) into a coding-ready project — clean structure, safe duplicate merging, AI trace removal with proof, and a shared multi-agent memory from day one.",
   "bin": {
     "design-to-dev": "bin/cli.js"

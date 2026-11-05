@@ -8,10 +8,12 @@ user-invocable: true
 
 Skill de pré-production : transforme un export de design en projet prêt à coder, organisé selon ce que l'utilisateur veut construire, avec des fondations vérifiées, des exigences de sécurité et une **mémoire multi-agents remplie pendant tout le travail** (Claude Code, Codex, Cursor, Gemini CLI, Copilot). Le nettoyage n'est qu'une étape : le livrable, c'est un projet agent-ready dès le premier jour, dont `etat.md` dit déjà par quoi commencer et dont le journal raconte comment il est né.
 
+Ce fichier est le **noyau** : règles, modes, journalisation, vue d'ensemble. Le détail d'une étape n'est chargé que quand on y est — `references/workflow-steps.md` (une section par étape : commandes complètes, cas particuliers, replis), `references/design-reuse.md`, `references/stacks.md`, `references/security.md`, `references/plan-format.md`.
+
 **Raccourci — mémoire seule.** Si l'utilisateur veut juste la mémoire, ou si le dossier est déjà propre : `npx design-to-dev init <dossier>` (ou `python "$SKILL/scripts/scaffold_memory.py" <dossier>`) puis `npx design-to-dev foundations <dossier>` suffisent, sans les étapes 1 à 5. Le proposer dès qu'aucun nettoyage n'est nécessaire.
 
 **Règles absolues :**
-- Le dossier source n'est JAMAIS modifié. Le résultat est construit dans un nouveau dossier cible (rollback = supprimer la cible).
+- Le dossier source n'est JAMAIS modifié. Le résultat est construit dans un nouveau dossier cible (rollback = supprimer la cible). Les rapports ne s'écrivent jamais dans un export de design brut (voir étape 6).
 - **On réutilise le design existant.** Une page ou une démo déjà faite est adaptée à la stack et branchée au backend, jamais redessinée (sauf demande explicite). Voir `references/design-reuse.md`.
 - **La mémoire s'écrit au fil de l'eau** : chaque étape est notée avant (EN COURS) et après (résultat), jamais en fin de session.
 
@@ -28,201 +30,49 @@ Scripts (Python 3.9+, stdlib uniquement) dans `scripts/` à côté de ce fichier
 | Plan superpowers (étape 7) | — | ✅ |
 | Audit Cloudflare security-audit (étape 8) | — | ✅ |
 
-Une étape non faite en mode rapide est quand même tracée : `preprod_log.py journal --step 7 --title "(ignorée — mode rapide)" "…"`. **Skill compagne absente** (superpowers, security-audit) et refus de l'installer → solution de repli décrite à l'étape, jamais de blocage.
+Une étape non faite en mode rapide est quand même tracée (`journal --step N --title "(ignorée — mode rapide)" --status IGNORÉ`, un seul appel). **Skill compagne absente** (superpowers, security-audit) et refus de l'installer → solution de repli décrite à l'étape, jamais de blocage.
 
-## Mémoire en direct (toutes les étapes)
+## Mémoire en direct : 2 appels par étape
 
 Tant que la cible n'existe pas (étapes 0 à 3), la mémoire vit dans `<scratchpad>/memoire-preprod/`. À l'étape 4 elle est rejouée dans `<cible>/.agents/memory/` (`--import-preprod`) ; ensuite on écrit directement là.
 
 ```bash
 M="<scratchpad>/memoire-preprod"   # puis "<cible>/.agents/memory" après l'étape 4
-python "$SKILL/scripts/preprod_log.py" etat     --dir "$M" --step N --status "EN COURS"          # AVANT l'étape
-python "$SKILL/scripts/preprod_log.py" journal  --dir "$M" --step N "fait : …" "résultat : …"  # APRÈS l'étape
-python "$SKILL/scripts/preprod_log.py" etat     --dir "$M" --step N --status TERMINÉ --next "…"
+
+# AVANT l'étape N — un appel
+python "$SKILL/scripts/preprod_log.py" etat    --dir "$M" --step N --status "EN COURS"
+
+# APRÈS l'étape N — un appel : journal + état mis à jour d'un coup
+python "$SKILL/scripts/preprod_log.py" journal --dir "$M" --step N --status TERMINÉ --next "<action exacte>" "fait : …" "résultat : …"
+```
+
+Et **seulement quand c'est pertinent** (jamais en routine) :
+
+```bash
 python "$SKILL/scripts/preprod_log.py" decision --dir "$M" --title "…" --why "…" --alt "…" --by utilisateur "…"
 python "$SKILL/scripts/preprod_log.py" probleme --dir "$M" --context "…" --cause "…" --fix "…" --avoid "…" "…"
 ```
 
-Chaque entrée est horodatée et signée (`--agent`, défaut `design-to-dev` ; mettre `claude-code`, `codex`…). Le script **refuse** un secret ou une consigne pour agent et n'écrit rien : écrire le nom de la variable d'environnement, décrire le fait sans recopier la consigne.
+Chaque entrée est horodatée et signée (`--agent`, défaut `design-to-dev` ; mettre `claude-code`, `codex`…). Le script **refuse** un secret ou une consigne pour agent et n'écrit rien : écrire le nom de la variable d'environnement, décrire le fait sans recopier la consigne. Quoi noter à chaque étape : table dans `references/workflow-steps.md` ; `scaffold_memory.py <cible> --check` exige à la fin une entrée de journal par étape 0 à 9.
 
-| Étape | journal.md | etat.md | decisions / problemes / changements |
-|---|---|---|---|
-| 0 Cadrage | mode, stack, agents, source et cible | objectif global, EN COURS → TERMINÉ | décisions « mode » et « stack » (Validée par : utilisateur) |
-| 1 Inventaire | nb de fichiers, intention, `project.mode` | vigilance : CDN, données perso, framework | — |
-| 2 Sous-agents | équipes lancées, conclusions | questions ouvertes (2b) | désaccords → problemes |
-| 3 Plan de nettoyage | arbre cible, nb keep / move / delete | EN ATTENTE DE VALIDATION puis TERMINÉ | décision « arborescence » à la validation |
-| 4 Application | copiés, chemins réécrits, `verify` | fichiers clés (`--files`) | changements (importés du file-map) |
-| 5 Fichiers racine | fichiers créés | fait récemment | changements CRÉÉ |
-| 6 Fondations et sécurité | bilan ✅ / ⚠️ / ❌ | « Base vérifiée le … » (automatique) | chaque ❌ → problemes |
-| 7 Plan superpowers | chemin du plan, ou « ignorée — mode rapide » | prochaine étape = 1re tâche | — |
-| 8 Audit Cloudflare | guidance faite, ou « ignorée — mode rapide » | vigilance | `confirmed` → problemes |
-| 9 Clôture | résumé final | TERMINÉ, prochaine étape exacte, `--commands` | — |
+## Les étapes en bref
 
-`scaffold_memory.py <cible> --check` vérifie ensuite la mémoire (`memory_hook.py doctor`, acte de naissance présent, aucun « à compléter ») et la présence d'une entrée de journal par étape 0 à 9.
+Le détail complet (commandes, cas particuliers, replis) : `references/workflow-steps.md`, section du même numéro — à lire au début de chaque étape.
 
-## Étape 0 — Cadrage (demander, ne pas deviner)
-
-Confirmer avec l'utilisateur (une seule question groupée) :
-1. Dossier source (chemin exact).
-2. Dossier cible — défaut : dossier frère `<nom-en-kebab-case>/`. Il doit être vide ou inexistant.
-3. **Mode : rapide (défaut) ou complet** (tableau ci-dessus).
-4. Ce qu'il veut construire si déjà connu (site vitrine, dashboard, app desktop, iOS, Android, API) et **sa stack** s'il en a une. Un profil `~/.design-to-dev/stack.json` (ou `DESIGN_TO_DEV_STACK`) remplace les stacks par défaut : `scan` l'affiche, ne pas reposer la question s'il existe.
-5. Mémoire `.agents/memory/` partagée (committée) ou personnelle (gitignorée). Défaut : partagée.
-6. Agents à brancher sur la mémoire : `claude`, `codex`, `cursor`, `gemini`, `copilot`. Défaut : `claude,codex`.
-
-Dès la réponse : `etat --step 0 --objective "…"`, `journal --step 0`, `decision` (mode, stack).
-
-## Étape 1 — Inventaire et détection du projet
-
-```bash
-python "$SKILL/scripts/organize.py" inventory "<source>" --out "<scratchpad>/inventory.json"
-python "$SKILL/scripts/detect_project.py" scan "<source>" --out "<scratchpad>/design-inventory.json"
-```
-
-- `inventory` : pour chaque fichier, type, taille, hash (doublons exacts), empreinte normalisée (`near-duplicate` : même contenu aux commentaires et espaces près), références entrantes/sortantes, orphelins, signaux (`generated`, `tool-artifact`, `os-junk`, `duplicate`, `backup-copy`, `personal-data?`, `large`…).
-- `dedupe` (`organize.py dedupe "<source>"`) : analyse chaque groupe de doublons avec le graphe de références et propose des actions de plan. Doublon exact → **fusion** (`delete` + `replaced_by` vers la copie la plus référencée, les références sont réécrites à l'application). Quasi-doublon → **`review`** : deux variantes proches peuvent porter des écrans différents (un bouton lié ici, sa variante liée là), la fusion se décide avec l'utilisateur, jamais seul.
-- `scan` : intention estimée (primaire, secondaires, `ambiguous`), frameworks déjà présents, chaque écran (`page` / `demo` / `fragment` / `component`, fonctionnalités, champs, colonnes, appels API, données mock, statut `static` / `mock-data` / `wired`), premier contrat backend (auth, rôles, entités, endpoints), stack conseillée (ou celle du profil), livrables déjà présents et manquants.
-
-Lire les résumés affichés, pas tout le JSON. `scan` donne aussi `project.mode` et `next_step` (prochaine étape exacte).
-
-### 1b — Projet déjà commencé ? (`project.mode`)
-
-- `fresh` : export de design à structurer → étapes 2 à 9 normalement.
-- `existing` (manifeste + code, lockfile ou plusieurs dossiers de code) : **mode « nettoyer + compléter »**. Ne pas réorganiser l'arborescence ni porter la stack ; une stack déjà en place (ex. Supabase) est gardée. L'équipe nettoyage ne propose que des `delete` de déchets évidents (`os-junk`, `tool-artifact`, `backup-copy`, doublons exacts) et l'équipe design se limite à `screens` + `data-contract` pour `docs/design/screens.md`. Ne produire que les livrables listés « Manque » par `scan`. Si rien n'est à nettoyer : `init` puis étape 6. Travailler dans le dossier lui-même seulement avec l'accord explicite de l'utilisateur et un worktree git propre ; sinon copie dans une cible comme d'habitude.
-
-## Étape 2 — Analyse par sous-agents (en parallèle, un seul message)
-
-Lancer **dans le même message** (Claude Code : outil Agent ; Codex : `spawn_agent` si disponible ; sinon l'un après l'autre) :
-
-- **Équipe nettoyage** — `references/subagent-prompts.md` : `code`, `assets`, `docs-tooling`, `architect` (3 à 6 selon la taille ; découper au-delà de ~150 fichiers par agent). Entrées : `inventory.json`, `design-inventory.json`, leur tranche, `references/classification-rules.md`, `references/folder-conventions.md`. Sortie : `{src, action, dst, reason, confidence}`.
-- **Équipe design** — `references/design-reuse.md` : `screens` (écrans et démos existants, doublons, manquants), `components` (composants et tokens), `data-contract` (ce que le backend doit fournir), `intent` (ce que l'utilisateur veut construire), `stack-adapter` (chaque écran → route/vue de la stack, `as-is|adapt|port`).
-
-Ne pas faire leur travail en parallèle : attendre leurs résultats.
-
-### 2b — Questions si l'intention n'est pas claire
-
-Si `design-inventory.json` dit `ambiguous`, si l'agent `intent` a une confiance < 0.7, ou si le design utilise déjà un framework différent de la stack conseillée : **poser une seule question groupée** (questions proposées par `scan` et par `intent`, choix garder/porter le framework, stack confirmée — voir `references/stacks.md`). Ne pas continuer avant la réponse. Questions → `etat --question`, réponses → `decision`.
-
-## Étape 3 — Plan de réorganisation (selon la stack)
-
-Fusionner les résultats dans `<scratchpad>/plan.json` (format : `references/plan-format.md`). L'arborescence cible suit l'intention confirmée (`references/stacks.md`, `references/folder-conventions.md` § « Selon l'intention »). Règles :
-- Tout fichier de l'inventaire a **exactement une** action (`keep` | `move` | `delete`).
-- Désaccord entre agents, `confidence < 0.7`, ou `personal-data?` → `"review": true`.
-- **Ne jamais supprimer un fichier référencé par un fichier conservé**, sauf `replaced_by`.
-- **Écran ou démo abouti → jamais `delete`.** Doublons d'écran : garder le plus complet, les autres vont dans `prototypes/archive/`.
-- Doublons : partir de la sortie de `organize.py dedupe` (étape 1), qui choisit déjà la copie canonique (la plus référencée, au nom propre). Doublon exact → `delete` avec `replaced_by` : `apply` réécrit toutes les références vers le canonique. Quasi-doublon (`near-duplicate`) → `review` et question à l'utilisateur : si les deux variantes font doublon fonctionnel, fusionner en un seul fichier (`delete` + `replaced_by`) ; si chacune sert un écran différent, garder les deux sous des noms clairs. `plan-check` refuse la suppression d'un doublon encore référencé sans `replaced_by`.
-
-```bash
-python "$SKILL/scripts/organize.py" plan-check "<scratchpad>/plan.json" --inventory "<scratchpad>/inventory.json"
-python "$SKILL/scripts/organize.py" apply "<scratchpad>/plan.json"            # dry-run : affiche l'arbre cible
-```
-
-**Présenter à l'utilisateur et attendre son accord explicite** (`etat --status "EN ATTENTE DE VALIDATION"`) : intention et stack retenues, arbre cible, écrans réutilisés (et ce qu'il faudra brancher), suppressions groupées avec raison et taille, éléments `review`. Rien n'est appliqué avant un « oui ».
-
-## Étape 4 — Application, puis installation de la mémoire
-
-```bash
-python "$SKILL/scripts/organize.py" apply "<scratchpad>/plan.json" --apply
-python "$SKILL/scripts/organize.py" verify "<cible>"
-python "$SKILL/scripts/scaffold_memory.py" "<cible>" --name "<Nom du projet>" --file-map "<cible>/docs/cleanup/file-map.json" --inventory "<scratchpad>/design-inventory.json" --agents claude,codex --import-preprod "<scratchpad>/memoire-preprod" [--private-memory] [--next-step "<action>"]
-```
-
-`apply` copie (jamais ne déplace), réécrit les chemins relatifs et écrit `docs/cleanup/file-map.json` + `docs/cleanup/report.md`. `verify` liste les références cassées : corriger chacune puis relancer jusqu'à zéro, ou les documenter.
-
-`scaffold_memory.py` crée sans écraser : `.agents/memory/` (`MEMORY.md`, `etat.md`, `journal.md`, `changements.md`, `decisions.md`, `problemes.md`, `PROTOCOLE.md`, `GRAPHE.md`), `.agents/hooks/memory_hook.py`, `.agents/graph/graph.json`, `AGENTS.md` (bloc géré, avec les **règles permanentes** du projet), et selon `--agents` : `CLAUDE.md` + `.claude/settings.json`, `.codex/hooks.json`, `.cursor/rules/`, `GEMINI.md`, `.github/copilot-instructions.md`. Auto-test des hooks à la fin.
-- `--import-preprod` rejoue la mémoire provisoire : journal trié par date, décisions, problèmes, changements, état (objectif, tâche, prochaine étape, vigilance).
-- `MEMORY.md` commence par l'**acte de naissance** (`## Origine du projet` : création, fondations, plan validé), jamais réécrit ensuite ; seule la ligne Fondations est complétée à l'étape 6.
-- `--check` vérifie, `--update` met à jour le hook (et ajoute l'acte de naissance s'il manque).
-
-Si l'intention ou la stack confirmée diffère du `next_step` détecté, passer `--next-step` avec l'action exacte. Notes durables : `python .agents/hooks/memory_hook.py note <sujet> "<fait>"`.
-
-### 4b — Traces d'IA (par défaut, sous-agent, design inchangé)
-
-Les exports d'outils IA (v0, Lovable, Bolt, Claude, Codex, Copilot…) laissent des signatures. Elles sont retirées **de la cible, jamais de la source**, avant toute autre étape :
-
-```bash
-python "$SKILL/scripts/ai_traces.py" clean "<cible>" --dry-run   # ce qui serait retiré, rien d'écrit
-python "$SKILL/scripts/ai_traces.py" clean "<cible>"             # → docs/cleanup/traces-ia.md
-```
-
-- Retiré automatiquement : commentaires « Generated by / Made with <outil IA> » seuls sur leur ligne, `<meta name="generator">` d'un outil IA, pieds de page Markdown « 🤖 Generated with… » et `Co-Authored-By` hors blocs de code, lignes « This project was built with <outil IA> », **sections boilerplate** (« ## Build with Lovable », « ## Built with v0 »…) jusqu'au prochain titre de même niveau, **attributs de traçage** (`data-lov-id`, `data-lov-name`, `data-component-*` — jamais dans une chaîne ni un commentaire), **scripts injectés** (`cdn.gpteng.co/gptengineer.js`…), **badges** (lien vers le domaine de l'outil + texte « Edit with / Made with… », sans contenu imbriqué), **plugin de marquage** (import de `lovable-tagger`, appels `componentTagger()`, et son entrée dans `package.json` — preuve par comparaison JSON), caractères invisibles de filigrane (zero-width hors écritures qui en ont besoin, tags Unicode hors drapeaux, BOM en milieu de fichier, bidi sans texte RTL). Les emoji composés, espaces insécables et drapeaux restent. Les dépendances **fonctionnelles** (ex. `@lovable.dev/mcp-js` utilisé par le code) ne sont jamais retirées : elles sont signalées.
-- **Preuve avant chaque écriture** : jetons du code, chaînes, attributs et texte affiché doivent être identiques avant / après (les retraits d'IA volontaires sont normalisés des deux côtés de la comparaison) ; sinon le fichier n'est pas touché (❌ dans le rapport). Pour `package.json`, le JSON final doit être l'original moins exactement les clés retirées. Écriture atomique.
-- Seulement signalé (⚠️, section « À vérifier ») : badges avec contenu imbriqué, liens vers l'outil (favicon, og:image, URL de déploiement — c'est du contenu), traces mêlées à du code, invisibles dans des chaînes. Un **sous-agent** les examine un par un : capture avant / après de chaque page touchée (navigateur intégré, aperçu du projet s'il existe), mise en page identique, console sans nouvelle erreur ; sinon il annule le retrait et le note dans le rapport.
-- Puis `organize.py verify "<cible>"` et les tests du projet s'il y en a. Ignorés : `.claude/`, `.codex/`, `.agents/`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, lockfiles, `docs/security/`.
-- Ensuite, aucun agent n'en rajoute (règle permanente posée par `scaffold_memory.py`) ; `foundations` les signale (⚠️ ai-trace) et `ai-traces scan . --strict` sert avant chaque commit.
-
-## Étape 5 — Fichiers racine et contrat de production
-
-Créer dans la cible (s'ils n'existent pas) :
-- `README.md` : ce qu'est le projet, stack, comment lancer, arborescence commentée.
-- `.gitignore` (node_modules, dist, build, .next, target, .env, .DS_Store, Thumbs.db, `.agents/graph/events.jsonl`, `.claude/settings.local.json`).
-- `.env.example` (noms de variables seulement, jamais de valeurs) si des variables existent.
-- `docs/design/screens.md` : la table écran → source → route cible → statut → données → endpoints → rôle → action prod (`references/design-reuse.md` § Fusion). C'est le contrat de la production.
-- `docs/architecture/stack.md` : intention confirmée, stack et raison, framework gardé ou porté, arborescence, contrat backend.
-- `docs/adr/0001-structure-du-projet.md` (architecte) et `docs/design-system/README.md` (fondations reprises du design).
-- Skill d'outil de design (`SKILL.md` racine de l'export) → `.agents/skills/<nom-du-ds>/SKILL.md`, chemins corrigés.
-- Ne pas inventer de `LICENSE` : demander.
-
-## Étape 6 — Fondations et exigences de sécurité (avant tout plan)
-
-Lire `references/security.md`.
-
-```bash
-python "$SKILL/scripts/security_check.py" foundations "<cible>" [--online] # → docs/security/fondations.md + dependances.md
-python "$SKILL/scripts/security_check.py" deps "<cible>" [--online]        # dépendances seules → docs/security/dependances.md
-python "$SKILL/scripts/security_check.py" scan "<cible>" --out "<cible>/docs/security/baseline.json"
-python "$SKILL/scripts/security_check.py" requirements --intent <intention[,backend]> --inventory "<scratchpad>/design-inventory.json" --out "<cible>/docs/security/exigences.md"
-```
-
-- `foundations` : la base est-elle saine ? ✅ / ⚠️ / ❌ pour les bibliothèques CDN ou copiées anciennes, les dépendances et leurs scripts d'installation, le code caché ou obfusqué, les fichiers étrangers (`.php`, `.exe`…), les caractères Unicode invisibles (Trojan Source), les consignes cachées pour IA, les secrets et les motifs à ne pas reproduire au portage. Met à jour la ligne Fondations de l'acte de naissance et « Base vérifiée le … » dans `etat.md`. `--run-audits` lance `npm audit` / `cargo audit` / `osv-scanner` s'ils sont installés (demander avant : accès réseau), sinon ils sont listés à lancer ; `--strict` sort en erreur s'il reste un ❌. Chaque ❌ → `problemes.md` ; **aucune tâche backend tant qu'un ❌ est ouvert**.
-- `deps` (aussi lancé par `foundations`) : inventaire de **tout** ce que le projet utilise — paquets npm / PyPI / crates / Composer / Go / RubyGems / pub (manifestes et lockfiles), bibliothèques CDN, runtimes (PHP, Node, Python, Ruby, Go via `composer.json`, `engines`, `.nvmrc`, `Dockerfile`…), frameworks et API externes appelées dans le code. **Demander l'accord de l'utilisateur avant `--online`** (seuls des noms et versions de paquets publics sont envoyés à OSV.dev, aux registres et à endoflife.date). En ligne : failles connues par version (CVE, gravité, **ce qu'elles touchent** — fonctions, CWE — et **version corrigée**), dernière version stable, historique des failles, dépréciations, fin de support. Une faille **sans correctif** ou un paquet malveillant → ❌ : choisir l'alternative proposée ou isoler la partie touchée. Ensuite, pour chaque ligne de la section « À vérifier sur le web » de `dependances.md`, **chercher sur le web** (avis de sécurité officiels, changelog, historique — ex. failles PHP passées) et noter la conclusion dans `.agents/memory/decisions.md`. Hors ligne, tout est marqué « non vérifié » : ne jamais conclure qu'une dépendance est saine sans `--online` ou recherche web.
-- `scan` : candidats seulement (`candidate` / `needs_validation`, CWE + ASVS + correctif minimal), jamais de sévérité. Trier chaque entrée (faux positif / à corriger / maquette seulement) dans `docs/security/baseline.md`. Secrets toujours masqués.
-- `requirements` : checklist par stack + exigences déduites des écrans + endpoints à protéger, à intégrer au plan.
-
-### 6b — Kit de sécurité du projet (avec accord)
-
-```bash
-python "$SKILL/scripts/security_kit.py" list "<cible>"                 # skills proposées selon le projet (versions épinglées)
-python "$SKILL/scripts/security_kit.py" install "<cible>" --dry-run    # téléchargement + scan, rien d'écrit
-python "$SKILL/scripts/security_kit.py" install "<cible>" --yes        # seulement après l'accord explicite de l'utilisateur
-python "$SKILL/scripts/security_kit.py" verify "<cible>" --strict      # → docs/security/kit-securite.md
-```
-
-- Montrer la liste (`list`) à l'utilisateur : nom, dépôt, licence, à quoi sert chaque skill. **Demander son accord** avant `install` (accès à codeload.github.com, copie dans `.claude/skills/`). `--optional` ajoute les skills marquées « accord requis » (elles vont en ligne ou demandent d'autres outils).
-- `install` télécharge chaque source à son commit épinglé, vérifie l'empreinte SHA-256 de **chaque fichier**, puis le scanne (commandes exécutées au chargement, hooks, contournement des permissions, consignes cachées, Unicode invisible, binaires). Un seul ❌ → skill refusée, rien n'est écrit. Une skill du même nom déjà présente dans le projet n'est jamais écrasée.
-- Il écrit `.claude/security-kit.lock.json`, `.claude/skills/THIRD_PARTY_NOTICES.md` (licences, attribution) et la section « Kit de sécurité » de `AGENTS.md` : quelles skills appliquer aux fondations, à chaque modification de code et avant chaque commit. Ces règles s'imposent ensuite à tous les agents.
-- Ne jamais lancer les scripts fournis par ces skills sans l'accord de l'utilisateur ; ne jamais modifier leurs fichiers (sinon `verify` les marque ❌).
-- `verify` avant chaque commit : empreintes du kit, scan de `.claude/`, `.agents/skills`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, et réglages dangereux de `settings.json` (`bypassPermissions`, `Bash(*)`, hooks).
-
-## Étape 7 — Plan du projet (superpowers) — mode complet
-
-Mode rapide : journal `--step 7 --title "(ignorée — mode rapide)"`, et `etat --next` = première tâche de `docs/design/screens.md` (ou le premier ❌ de `fondations.md`).
-
-```bash
-python "$SKILL/scripts/detect_project.py" skills --require superpowers
-```
-
-- **Absente** → demander à l'utilisateur de l'installer (commande affichée : Claude Code `/plugin install superpowers@claude-plugins-official` ; Codex : menu Plugins ; Gemini : `gemini extensions install https://github.com/obra/superpowers`). Ne pas installer soi-même. **Repli** s'il refuse : écrire le plan à la main dans `docs/plans/AAAA-MM-JJ-<projet>.md` avec la même structure.
-- **Présente** → skill `brainstorming` (courte : l'intention et le design sont déjà connus, ne reposer que les questions ouvertes) puis `writing-plans`. Entrées : `docs/design/screens.md`, `docs/architecture/stack.md`, `docs/security/fondations.md`, `docs/security/exigences.md`. Plan enregistré dans `docs/superpowers/plans/AAAA-MM-JJ-<projet>.md`.
-
-Exigences sur le plan :
-- Les ❌ de `fondations.md` forment la phase 0, avant toute fonctionnalité.
-- Chaque écran existant = une tâche **adapter + brancher** (route cible, endpoint, remplacement du mock, test), jamais « redessiner ».
-- Les écrans manquants sont dessinés avec les composants et tokens existants.
-- Les données mock deviennent seeds / fixtures de test.
-- Chaque tâche qui touche auth, données ou entrées utilisateur porte son exigence de sécurité et son test ; dernière phase « Durcissement ».
-
-## Étape 8 — Audit Cloudflare — mode complet
-
-Mode rapide : journal `--step 8 --title "(ignorée — mode rapide)"`.
-
-`python "$SKILL/scripts/detect_project.py" skills --require security-audit`. Absente → **demander** avant `npx skills add https://github.com/cloudflare/security-audit-skill --skill security-audit --global` ; **repli** s'il refuse : relire `docs/security/exigences.md` contre `references/security.md` à la main. Présente → mode guidance sur `docs/architecture/stack.md` et `docs/security/exigences.md` ; l'audit complet seulement sur demande explicite, une fois le backend écrit. Reporter les `confirmed` dans `.agents/memory/problemes.md` et dans le plan.
-
-## Étape 9 — Git et clôture
-
-- Demander avant `git init` + premier commit (`chore: structure initiale du projet depuis l'export design`).
-- `preprod_log.py etat --step 9 --status TERMINÉ --next "<action exacte>" --commands "Installer : …" --commands "Lancer : …"` et `journal --step 9`, puis `scaffold_memory.py "<cible>" --check` doit répondre « ok ».
-- Résumé final en 6 lignes max : mode, intention et stack, écrans réutilisés / à brancher / manquants, fichiers gardés / déplacés / supprimés, bilan des fondations (✅ / ⚠️ / ❌), chemin du plan, chemin de la cible.
+| Étape | Faire |
+|---|---|
+| **0 Cadrage** | Une question groupée : source, cible (vide ou inexistante), mode, intention + stack, mémoire partagée ?, agents à brancher. Dès la réponse : `etat --step 0 --objective`, `journal`, `decision` (mode, stack). |
+| **1 Inventaire** | `organize.py inventory` + `detect_project.py scan` (+ `dedupe` pour les doublons) ; lire les résumés, pas tout le JSON. `scan` fusionne les copies d'un même écran et relève les appels réels (`fetch("/api/…")`). `project.mode` : `fresh` → tout faire ; `existing` → nettoyer + compléter, sans restructurer (§ 1b). |
+| **2 Sous-agents** | Équipes nettoyage + design lancées en parallèle, un seul message (prompts : `references/subagent-prompts.md`). Intention ambiguë → une question groupée, attendre la réponse (§ 2b). |
+| **3 Plan** | `plan.json` (`references/plan-format.md`) : une action par fichier, jamais de suppression d'un fichier référencé sans `replaced_by`, écran abouti jamais supprimé, quasi-doublon → `review`. `plan-check` + `apply` en dry-run, puis **accord explicite** avant d'appliquer. |
+| **4 Application** | `apply --apply`, `verify` jusqu'à zéro référence cassée, `scaffold_memory.py --import-preprod` (mémoire + AGENTS.md + hooks, sans écraser). |
+| **4b Traces d'IA** | `ai_traces.py clean --dry-run` puis réel, sur la **cible** jamais la source ; preuve avant chaque écriture (jetons, chaînes, attributs, texte identiques), sous-agent + captures pour les cas douteux (§ 4b). |
+| **5 Fichiers racine** | README, .gitignore, .env.example, `docs/design/screens.md` (contrat de production : écran → route → endpoint), `docs/architecture/stack.md`, ADR. |
+| **6 Fondations** | `security_check.py foundations` + `scan` + `requirements` (détail : `references/security.md`). Sur un export brut, le rapport part hors de la source (sauf `--out` / `--write`). Chaque ❌ → problemes.md ; aucune tâche backend tant qu'un ❌ est ouvert. |
+| **6b Kit sécurité** | `security_kit.py` : skills de sécurité épinglées et scannées, **avec accord explicite** (§ 6b). |
+| **7 Plan superpowers** | Mode complet : brainstorming courte + writing-plans ; repli : plan manuel dans `docs/plans/` (§ 7). |
+| **8 Audit Cloudflare** | Mode complet : guidance security-audit ; repli : relecture des exigences (§ 8). |
+| **9 Clôture** | git (avec accord), un appel `journal --step 9 --status TERMINÉ --next … --commands …`, `--check` ok, résumé en 6 lignes. |
 
 ## Garde-fous
 

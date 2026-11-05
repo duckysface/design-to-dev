@@ -4,6 +4,37 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-11-05
+
+### Fixed
+
+- **`foundations` never writes into a raw design export anymore** (`_ds_manifest.json`,
+  `_ds_bundle.js`, `.bolt`, `.lovable`, `.replit` markers, no `.git`, no agent memory): the report
+  goes to a temp directory with a warning, unless `--out` is explicit or the new `--write` flag is
+  passed. The "source is never modified" rule now also covers reports.
+- **`scan` no longer double-counts duplicate screens**: copies of the same screen
+  (`screen-1`, `screen-1-final`… — same base name and same structure: features, table columns,
+  form fields) are merged into one entry whose canonical copy is the clean-named one, the others
+  listed under `duplicates`. Entities and endpoints are computed once. Two merely similar screens
+  serving different content are never merged.
+- **Real API calls in mockups are now part of the backend contract**: `fetch("/api/clients")`,
+  `axios.post(…)`, `useQuery(…)`… are captured with their method (read from the call, `GET`
+  otherwise), surface as `wired_calls`, join the `endpoints` list (deduplicated), and name the
+  entity (`GET /api/clients` → `clients`) instead of the file name.
+- **The default stack adapts to the actual need**: a showcase site with a simple contact form no
+  longer gets "Rust Axum" — the recommendation is a static Astro site on a CDN plus a serverless
+  function or form service (Formspree, Web3Forms). A dedicated backend is only suggested when
+  auth, payments, uploads or data entities are detected (`references/stacks.md` updated).
+
+### Changed
+
+- **Lighter `SKILL.md`** (~3 800 → ~1 400 words): the core keeps rules, modes, the 2-call logging
+  pattern and a steps overview table; the full per-step detail moved to
+  `references/workflow-steps.md`, loaded only for the step at hand.
+- **2 logging calls per step instead of 3–5**: `preprod_log.py journal` now accepts
+  `--status` / `--next` / `--done` / `--watch` / `--question` / `--files` / `--commands` and
+  updates `etat.md` in the same call. `decision` / `probleme` stay for when they matter.
+
 ## [2.6.0] - 2026-11-05
 
 ### Added — smart duplicates

@@ -10,10 +10,10 @@ The CLI is bilingual-agnostic: all commands work identically on Windows (`python
 | `--version` / `-v` | Prints the installed CLI version |
 | `run <folder>` | Runs the agent on a folder (`--codex`, `--print`) |
 | `init <folder>` | Installs only the memory on an existing project |
-| `scan <folder>` | Intent, screens, backend contract, recommended stack |
+| `scan <folder>` | Intent, screens (copies merged), backend contract incl. real `fetch("/api/…")` calls, stack adapted to the need |
 | `inventory <folder>` | Raw file inventory (types, hashes, references, signals) |
 | `dedupe <folder>` | Analyzes duplicate groups and proposes safe merges (`--out f.json`) |
-| `foundations <folder>` | Verifies the base ✅ / ⚠️ / ❌ (`--strict` for CI) |
+| `foundations <folder>` | Verifies the base ✅ / ⚠️ / ❌ (`--strict` for CI, `--write` to write inside a raw export) |
 | `deps <folder>` | Dependency audit (`--online` for CVEs, stable versions, end-of-life) |
 | `security <folder>` | Risk patterns (CWE + ASVS + fix hints) |
 | `security-kit list\|install\|verify <folder>` | Pinned security skills kit in `.claude/skills` |
@@ -77,12 +77,15 @@ python scripts/organize.py verify "<target>"
 
 # Detection and security
 python scripts/detect_project.py scan "<source>" --out design-inventory.json
-python scripts/security_check.py foundations "<target>" --strict
+python scripts/security_check.py foundations "<target>" --strict   # on a raw design export, the report
+python scripts/security_check.py foundations "<target>" --write    # goes to a temp dir unless --out/--write
 python scripts/security_check.py scan "<target>" --out baseline.json
 python scripts/security_check.py requirements --intent dashboard
 
-# Pre-production memory
-python scripts/preprod_log.py journal --dir "$M" --step 3 --agent claude-code "target tree approved"
+# Pre-production memory (2 calls per step: etat BEFORE, journal AFTER)
+python scripts/preprod_log.py etat --dir "$M" --step 3 --status "EN COURS"
+python scripts/preprod_log.py journal --dir "$M" --step 3 --status TERMINÉ --next "apply the plan" \
+  --agent claude-code "target tree approved"   # journal + etat.md updated in one call
 python scripts/scaffold_memory.py "<target>" --agents claude,codex --import-preprod "$M"
 python scripts/scaffold_memory.py "<target>" --check
 ```
@@ -93,7 +96,8 @@ Plan format: `references/plan-format.md`. Tests: `npm test`.
 
 | Path | Role |
 |---|---|
-| `SKILL.md` | The skill's runbook (steps 0 to 9) |
+| `SKILL.md` | The skill's core runbook (rules, modes, steps overview) |
+| `references/workflow-steps.md` | Full detail of each step, loaded on demand |
 | `references/` | Conventions, stacks, security, plan format, sub-agent prompts |
 | `scripts/organize.py` | Inventory, dedupe, plan check, copy, link verification |
 | `scripts/detect_project.py` | Intent, screens, backend contract, companion skills |

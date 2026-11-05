@@ -84,6 +84,43 @@ class ProjectTest(unittest.TestCase):
         self.assertIn("POST /api/auth/login", contract["endpoints"])
         self.assertIn("GET /api/clients", contract["endpoints"])
 
+    def test_duplicate_screens_merge_and_wired_call_wins(self):
+        dash = DASHBOARD.replace("<script>const mockClients = [{}];</script>", '<script>fetch("/api/clients")</script>')
+        (self.src / "demos" / "dashboard.html").write_text(dash, encoding="utf-8")
+        (self.src / "demos" / "dashboard-final.html").write_text(dash, encoding="utf-8")
+        data = self.scan()
+        demos = [s for s in data["screens"] if s["kind"] == "demo"]
+        self.assertEqual(len(demos), 1)
+        self.assertEqual(demos[0]["path"], "demos/dashboard.html")
+        self.assertEqual(demos[0]["duplicates"], ["demos/dashboard-final.html"])
+        self.assertEqual(demos[0]["status"], "wired")
+        contract = data["backend_contract"]
+        self.assertEqual(list(contract["entities"]), ["clients"])  # nommé d'après l'appel réel, pas le fichier
+        self.assertIn("GET /api/clients", contract["wired_calls"])
+        self.assertEqual(len(contract["endpoints"]), 8)  # 4 auth + 4 clients, l'appel réel dédoublonné
+
+    def test_similar_but_different_screens_are_not_merged(self):
+        other = "<html><body><h1>Commandes</h1><table><tr><th>N°</th><th>Total</th></tr></table></body></html>"
+        (self.src / "demos" / "orders.html").write_text(other, encoding="utf-8")
+        demos = [s for s in self.scan()["screens"] if s["kind"] == "demo"]
+        self.assertEqual(len(demos), 2)
+        self.assertFalse(any(s.get("duplicates") for s in demos))
+
+    def test_vitrine_contact_form_gets_light_stack(self):
+        vitrine = self.tmp / "vitrine"
+        vitrine.mkdir()
+        (vitrine / "index.html").write_text(
+            '<html><head><title>Studio</title></head><body><section class="hero"><h1>Studio</h1></section>'
+            '<section class="pricing">Tarifs</section><form><input type="email" name="email"></form></body></html>',
+            encoding="utf-8")
+        r = run([DETECT, "scan", vitrine, "--out", self.inv])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        data = json.loads(self.inv.read_text(encoding="utf-8"))
+        self.assertEqual(data["intent"]["primary"], "vitrine")
+        stack = data["recommended_stack"]["vitrine"]
+        self.assertIn("serverless", stack)
+        self.assertNotIn("Axum", stack)
+
     def test_empty_folder_is_ambiguous(self):
         empty = self.tmp / "vide"
         empty.mkdir()

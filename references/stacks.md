@@ -6,7 +6,7 @@ Résumé :
 
 | Intention | Stack conseillée |
 |---|---|
-| Site vitrine | Astro + Tailwind + Motion (îlots Svelte/React), Rust Axum si dynamique |
+| Site vitrine | Astro + Tailwind + Motion (statique, CDN) ; backend seulement si données/auth |
 | Dashboard | SvelteKit (ou Next.js) + Rust Axum + PostgreSQL |
 | Desktop | Tauri 2 |
 | iOS / macOS | SwiftUI (+ cœur Rust via UniFFI) |
@@ -20,7 +20,7 @@ Résumé :
 - **Frontend** : Astro (HTML statique, zéro JS par défaut), îlots Svelte ou React seulement pour l'interactif.
 - **Animations** : Motion (ex-Framer Motion), GSAP (ScrollTrigger), View Transitions API. Respecter `prefers-reduced-motion`.
 - **Style** : Tailwind CSS ; les tokens du design system deviennent `@theme` / `tailwind.config`.
-- **Dynamique** (formulaire de contact, newsletter, blog) : endpoint Rust Axum, ou Astro SSR minimal.
+- **Dynamique léger** (formulaire de contact, newsletter) : **pas de backend dédié** pour ça seul — fonction serverless (endpoint Astro, Vercel/Netlify) ou service de formulaires (Formspree, Web3Forms) avec validation côté serveur et anti-spam. Rust Axum seulement si base de données, comptes ou vraie logique serveur ; blog : contenu statique (collections Astro) ou CMS headless.
 - **Sécurité** : CSP stricte (pas de `unsafe-inline`, nonces/hashes), HTTPS forcé + HSTS, cookies `SameSite`, validation serveur de tout formulaire, jamais de HTML non échappé (`set:html` interdit sur du contenu utilisateur), anti-spam (rate limit + honeypot).
 
 ```
@@ -30,7 +30,7 @@ site/
   src/layouts/
   src/styles/         # tokens.css, global.css
   public/             # favicon, robots.txt, images optimisées
-  api/                # (optionnel) Rust Axum pour formulaires
+  api/                # (optionnel) fonctions serverless ; Rust Axum seulement si vrai backend
 ```
 
 ## Dashboard (connexion admin + utilisateur)

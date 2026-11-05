@@ -9,10 +9,14 @@ Refuse tout texte qui ressemble à un secret ou à une consigne pour agent (rien
 n'est jamais affichée).
 
   preprod_log.py journal --dir D --step 1 --title "Inventaire" "fait : 42 fichiers" "commande : detect_project.py scan"
+  preprod_log.py journal --dir D --step 1 --status TERMINÉ --next "Lancer les sous-agents" "fait : …"  # + etat.md à jour
   preprod_log.py decision --dir D "Garder Supabase" --why "déjà en place" --alt "Axum" --by "utilisateur"
   preprod_log.py probleme --dir D "Lien CDN mort" --cause "..." --fix "..." --avoid "..."
   preprod_log.py changement --dir D "src/app.js" --action CRÉÉ --why "porté depuis la maquette"
   preprod_log.py etat --dir D --step 2 --title "Sous-agents" --status "EN COURS" [--next ...] [--done ...] [--watch ...]
+
+Deux appels suffisent par étape : `etat --status "EN COURS"` AVANT, `journal … --status TERMINÉ --next …`
+APRÈS (le journal et l'état sont écrits d'un coup). `decision` / `probleme` seulement quand pertinent.
 """
 import argparse
 import re
@@ -136,6 +140,9 @@ def cmd_journal(a, d, stamp):
     lines = [f"## {stamp} — Session préproduction — {a.agent} — {step_label(a.step, a.title) or 'note'}"]
     lines += [f"- {one_line(t)}" for t in a.text]
     append(d / "journal.md", "\n".join(lines))
+    # --status / --next / --done … sur un journal : l'état est mis à jour dans le même appel
+    if a.status or a.objective or a.next or a.done or a.watch or a.question or a.files or a.commands:
+        cmd_etat(a, d, stamp)
 
 
 def cmd_decision(a, d, stamp):
@@ -161,7 +168,7 @@ def cmd_changement(a, d, stamp):
 def cmd_etat(a, d, stamp):
     p = d / "etat.md"
     label = step_label(a.step, a.title or " ".join(a.text)) or "Préproduction design-to-dev"
-    task = f"{label} — statut : {a.status}"
+    task = f"{label} — statut : {a.status or 'EN COURS'}"
     text = p.read_text(encoding="utf-8") if p.exists() else ETAT.format(stamp=stamp, task=task)
     text = re.sub(r"^# État courant — mis à jour le .*$", f"# État courant — mis à jour le {stamp}", text, count=1,
                   flags=re.M)
@@ -201,7 +208,8 @@ def main():
     ap.add_argument("--fix")
     ap.add_argument("--avoid")
     ap.add_argument("--action", choices=ACTIONS, default="CRÉÉ")
-    ap.add_argument("--status", choices=STATUSES, default="EN COURS")
+    ap.add_argument("--status", choices=STATUSES, default=None, help="etat : statut (défaut EN COURS) ; "
+                    "journal : met aussi etat.md à jour")
     ap.add_argument("--objective")
     ap.add_argument("--next")
     ap.add_argument("--done", action="append")

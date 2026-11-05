@@ -333,12 +333,17 @@ def main():
     f.add_argument("--online", action="store_true",
                    help="vérifier failles, versions stables et support en ligne (OSV.dev, registres, endoflife.date)")
     f.add_argument("--json", action="store_true")
+    f.add_argument("--write", action="store_true",
+                   help="écrire le rapport même dans un export de design (déconseillé : la source "
+                        "n'est jamais modifiée par défaut)")
     d = sub.add_parser("deps", help="failles connues, versions stables et support des dépendances → dependances.md")
     d.add_argument("folder")
     d.add_argument("--out")
     d.add_argument("--online", action="store_true", help="envoie seulement des noms et versions de paquets publics")
     d.add_argument("--strict", action="store_true", help="code 1 s'il reste un ❌")
     d.add_argument("--json", action="store_true")
+    d.add_argument("--write", action="store_true",
+                   help="écrire le rapport même dans un export de design (déconseillé)")
     b = sub.add_parser("requirements")
     b.add_argument("--intent", required=True)
     b.add_argument("--inventory")
@@ -348,9 +353,10 @@ def main():
         return scan(args.folder, args.json, args.out)
     if args.cmd == "foundations":
         return load_foundations().run(args.folder, args.out, args.strict, args.run_audits, args.json, collect,
-                                      skill_version(), args.online)
+                                      skill_version(), args.online, force_write=args.write)
     if args.cmd == "deps":
-        return load_foundations().run_deps(args.folder, args.out, args.online, args.json, args.strict, skill_version())
+        return load_foundations().run_deps(args.folder, args.out, args.online, args.json, args.strict,
+                                           skill_version(), force_write=args.write)
     return requirements(args.intent, args.inventory, args.out)
 
 
